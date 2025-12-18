@@ -80,21 +80,13 @@ const createAd = async (ad) => {
     $logger.debug('adRepositorie: createAd')
 
     const query = `
-        INSERT INTO ads( id, url, title, searchTerm, price, created, lastUpdate )
-        VALUES( ?, ?, ?, ?, ?, ?, ? )
-    `
+        INSERT INTO ads( id, url, title, searchTerm, price, created, lastUpdate, userId )
+        VALUES( ?, ?, ?, ?, ?, ?, ?, ? )
+    `;
 
-    const now = new Date().toISOString()
+    const now = new Date().toISOString();
 
-    const values = [
-        ad.id,
-        ad.url,
-        ad.title,
-        ad.searchTerm,
-        ad.price,
-        now,
-        now
-    ]
+    const values = [ad.id, ad.url, ad.title, ad.searchTerm, ad.price, now, now, ad.userId || null];
 
     return new Promise(function (resolve, reject) {
         db.run(query, values, function (error, rows) {

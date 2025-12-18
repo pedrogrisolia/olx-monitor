@@ -17,7 +17,8 @@ const createTables = async () => {
         "price"         INTEGER NOT NULL,
         "url"           TEXT NOT NULL,
         "created"       TEXT NOT NULL,
-        "lastUpdate"    TEXT NOT NULL
+        "lastUpdate"    TEXT NOT NULL,
+        "userId"        INTEGER
     );`,
 
     `CREATE TABLE IF NOT EXISTS "logs" (
@@ -29,18 +30,50 @@ const createTables = async () => {
         "maxPrice"      NUMERIC NOT NULL, 
         "created"       TEXT NOT NULL,
         PRIMARY KEY("id" AUTOINCREMENT)
-    );`
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS "users" (
+        "id"            INTEGER PRIMARY KEY,
+        "username"      TEXT,
+        "firstName"     TEXT,
+        "lastName"      TEXT,
+        "created"       TEXT NOT NULL
+    );`,
+
+    `CREATE TABLE IF NOT EXISTS "user_urls" (
+        "id"            INTEGER PRIMARY KEY AUTOINCREMENT,
+        "userId"        INTEGER NOT NULL,
+        "url"           TEXT NOT NULL,
+        "label"         TEXT,
+        "isActive"      INTEGER DEFAULT 1,
+        "created"       TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES users(id)
+    );`,
   ];
 
-  return new Promise(function(resolve, reject) {
+  // Add userId column to ads table if it doesn't exist (for existing databases)
+  const alterQueries = [`ALTER TABLE ads ADD COLUMN userId INTEGER;`];
+
+  return new Promise(function (resolve, reject) {
     // Iterate through the array of queries and execute them one by one
     const executeQuery = (index) => {
       if (index === queries.length) {
-        resolve(true); // All queries have been executed
+        // After creating tables, try to add userId column to ads (will fail silently if already exists)
+        const executeAlter = (alterIndex) => {
+          if (alterIndex === alterQueries.length) {
+            resolve(true);
+            return;
+          }
+          db.run(alterQueries[alterIndex], function (error) {
+            // Ignore error if column already exists
+            executeAlter(alterIndex + 1);
+          });
+        };
+        executeAlter(0);
         return;
       }
 
-      db.run(queries[index], function(error) {
+      db.run(queries[index], function (error) {
         if (error) {
           reject(error);
           return;

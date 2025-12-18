@@ -13,111 +13,116 @@ let validAds = 0
 let adsFound = 0
 let nextPage = true
 
-const scraper = async (url) => {
-    page = 1
-    maxPrice = 0
-    minPrice = 99999999
-    sumPrices = 0
-    adsFound = 0
-    validAds = 0
-    nextPage = true
+const scraper = async (urlInfo) => {
+  page = 1;
+  maxPrice = 0;
+  minPrice = 99999999;
+  sumPrices = 0;
+  adsFound = 0;
+  validAds = 0;
+  nextPage = true;
 
-    const parsedUrl = new URL(url)
-    const searchTerm = parsedUrl.searchParams.get('q') || ''
-    const notify = await urlAlreadySearched(url)
-    $logger.info(`Will notify: ${notify}`)
+  // Suporta tanto string simples quanto objeto
+  const url = typeof urlInfo === "string" ? urlInfo : urlInfo.url;
+  const userId = typeof urlInfo === "object" ? urlInfo.userId : null;
+  const chatId = typeof urlInfo === "object" ? urlInfo.chatId : null;
 
-    do {
-        currentUrl = setUrlParam(url, 'o', page)
-        let response
-        try {
-            response        = await $httpClient(currentUrl)
-            const $         = cheerio.load(response)
-            nextPage        = await scrapePage($, searchTerm, notify, url)
-        } catch (error) {
-            $logger.error(error)
-            return
-        }
-        page++
+  const parsedUrl = new URL(url);
+  const searchTerm = parsedUrl.searchParams.get("q") || "";
+  const notify = await urlAlreadySearched(url);
+  $logger.info(`Will notify: ${notify}`);
 
-    } while (nextPage);
-
-    $logger.info('Valid ads: ' + validAds)
-
-    if (validAds) {
-        const averagePrice = sumPrices / validAds;
-
-        $logger.info('Maximum price: ' + maxPrice)
-        $logger.info('Minimum price: ' + minPrice)
-        $logger.info('Average price: ' + sumPrices / validAds)
-
-        const scrapperLog = {
-            url,
-            adsFound: validAds,
-            averagePrice,
-            minPrice,
-            maxPrice,
-        }
-
-        await scraperRepository.saveLog(scrapperLog)
-    }
-}
-
-const scrapePage = async ($, searchTerm, notify) => {
+  do {
+    currentUrl = setUrlParam(url, "o", page);
+    let response;
     try {
-        const script = $('script[id="__NEXT_DATA__"]').text()
-
-        if (!script) {
-            return false
-        }
-
-        const adList = JSON.parse(script).props.pageProps.ads
-
-        if (!Array.isArray(adList) || !adList.length ) {
-            return false
-        }
-
-        adsFound += adList.length
-
-        $logger.info(`Checking new ads for: ${searchTerm}`)
-        $logger.info('Ads found: ' + adsFound)
-
-        for (let i = 0; i < adList.length; i++) {
-
-            $logger.debug('Checking ad: ' + (i + 1))
-
-            const advert = adList[i]
-            const title = advert.subject
-            const id = advert.listId
-            const url = advert.url
-            const price = parseInt(advert.price?.replace('R$ ', '')?.replace('.', '') || '0')
-
-            const result = {
-                id,
-                url,
-                title,
-                searchTerm,
-                price,
-                notify
-            }
-
-            const ad = new Ad(result)
-            ad.process()
-
-            if (ad.valid) {
-                validAds++
-                minPrice = checkMinPrice(ad.price, minPrice)
-                maxPrice = checkMaxPrice(ad.price, maxPrice)
-                sumPrices += ad.price
-            }
-        }
-
-        return true
+      response = await $httpClient(currentUrl);
+      const $ = cheerio.load(response);
+      nextPage = await scrapePage($, searchTerm, notify, url, userId, chatId);
     } catch (error) {
-        $logger.error(error);
-        throw new Error('Scraping failed');
+      $logger.error(error);
+      return;
     }
-}
+    page++;
+  } while (nextPage);
+
+  $logger.info("Valid ads: " + validAds);
+
+  if (validAds) {
+    const averagePrice = sumPrices / validAds;
+
+    $logger.info("Maximum price: " + maxPrice);
+    $logger.info("Minimum price: " + minPrice);
+    $logger.info("Average price: " + sumPrices / validAds);
+
+    const scrapperLog = {
+      url,
+      adsFound: validAds,
+      averagePrice,
+      minPrice,
+      maxPrice,
+    };
+
+    await scraperRepository.saveLog(scrapperLog);
+  }
+};
+
+const scrapePage = async ($, searchTerm, notify, url, userId = null, chatId = null) => {
+  try {
+    const script = $('script[id="__NEXT_DATA__"]').text();
+
+    if (!script) {
+      return false;
+    }
+
+    const adList = JSON.parse(script).props.pageProps.ads;
+
+    if (!Array.isArray(adList) || !adList.length) {
+      return false;
+    }
+
+    adsFound += adList.length;
+
+    $logger.info(`Checking new ads for: ${searchTerm}`);
+    $logger.info("Ads found: " + adsFound);
+
+    for (let i = 0; i < adList.length; i++) {
+      $logger.debug("Checking ad: " + (i + 1));
+
+      const advert = adList[i];
+      const title = advert.subject;
+      const id = advert.listId;
+      const adUrl = advert.url;
+      const price = parseInt(advert.price?.replace("R$ ", "")?.replace(".", "") || "0");
+
+      const result = {
+        id,
+        url: adUrl,
+        title,
+        searchTerm,
+        price,
+        notify,
+        userId,
+        chatId,
+      };
+
+      const ad = new Ad(result);
+      ad.process();
+
+      if (ad.valid) {
+        validAds++;
+        minPrice = checkMinPrice(ad.price, minPrice);
+        maxPrice = checkMaxPrice(ad.price, maxPrice);
+        sumPrices += ad.price;
+      }
+    }
+
+    return true;
+  } catch (error) {
+    $logger.error(error);
+    throw new Error("Scraping failed");
+  }
+};
 
 const urlAlreadySearched = async (url) => {
     try {

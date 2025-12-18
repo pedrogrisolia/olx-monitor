@@ -16,6 +16,8 @@ class Ad {
         this.valid      = false
         this.saved      = null,
         this.notify     = ad.notify
+        this.userId     = ad.userId || null
+        this.chatId     = ad.chatId || null
     }
 
     process = async () => {
@@ -64,8 +66,8 @@ class Ad {
 
         if (this.notify) {
             try {
-                const msg = 'New ad found!\n' + this.title + ' - R$' + this.price + '\n\n' + this.url
-                notifier.sendNotification(msg, this.id)
+                const msg = '🆕 Novo anúncio encontrado!\n' + this.title + ' - R$' + this.price + '\n\n' + this.url
+                await notifier.sendNotification(msg, this.chatId)
             } catch (error) {
                 $logger.error('Could not send a notification')
             }
@@ -95,13 +97,13 @@ class Ad {
 
                 const decreasePercentage = Math.abs(Math.round(((this.price - this.saved.price) / this.saved.price) * 100))
 
-                const msg = 'Price drop found! ' + decreasePercentage + '% OFF!\n' +
-                    'From R$' + this.saved.price + ' to R$' + this.price + '\n\n' + this.url
+                const msg =
+                  "📉 Preço baixou " + decreasePercentage + "%!\n" + "De R$" + this.saved.price + " para R$" + this.price + "\n\n" + this.url;
 
                 try {
-                    await notifier.sendNotification(msg, this.id)
+                  await notifier.sendNotification(msg, this.chatId);
                 } catch (error) {
-                    $logger.error(error)
+                  $logger.error(error);
                 }
             }
         }
