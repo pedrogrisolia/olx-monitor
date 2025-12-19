@@ -121,24 +121,34 @@ cron.schedule() → runScraper() (periodicamente)
 **Funções Principais**:
 
 - `scraper(url)`: Função principal que processa uma URL de busca
-  - Reseta variáveis de estado
-  - Verifica se URL já foi pesquisada
-  - Loop através de páginas até não haver mais resultados
-  - Salva estatísticas finais
+ - Reseta variáveis de estado
+ - Verifica se URL já foi pesquisada
+ - Extrai `totalOfAds` do script `#datalayer` na primeira iteração (página 1)
+ - Usa `totalOfAds` como limite se disponível, senão usa `MAX_ADS_PER_SEARCH` (500)
+ - Notifica usuário na primeira execução se houver `totalOfAds` disponível
+ - Loop através de páginas até não haver mais resultados ou atingir limite
+ - Salva estatísticas finais
 
 - `scrapePage($, searchTerm, notify, url)`: Processa uma página individual
-  - Extrai script `__NEXT_DATA__` usando Cheerio
-  - Parse do JSON para obter lista de anúncios
-  - Processa cada anúncio através da classe Ad
-  - Retorna `true` se há mais páginas, `false` caso contrário
+ - Extrai script `__NEXT_DATA__` usando Cheerio
+ - Parse do JSON para obter lista de anúncios
+ - Processa cada anúncio através da classe Ad
+ - Respeita limite de `maxAdsLimit` (pode ser `totalOfAds` ou `MAX_ADS_PER_SEARCH`)
+ - Retorna `true` se há mais páginas, `false` caso contrário
+
+- `extractTotalOfAds($)`: Extrai total de anúncios do dataLayer
+ - Busca script `#datalayer` na página
+ - Extrai objeto JSON do `dataLayer.push()`
+ - Retorna `totalOfAds` de `page.detail.totalOfAds` se disponível
+ - Retorna `null` se não encontrar ou houver erro
 
 - `urlAlreadySearched(url)`: Verifica histórico de buscas
-  - Consulta tabela `logs` para verificar se URL já foi pesquisada
-  - Retorna `true` se já foi pesquisada (deve notificar)
-  - Retorna `false` na primeira execução (não notifica)
+ - Consulta tabela `logs` para verificar se URL já foi pesquisada
+ - Retorna `true` se já foi pesquisada (deve notificar)
+ - Retorna `false` na primeira execução (não notifica)
 
 - `setUrlParam(url, param, value)`: Utilitário para modificar parâmetros de URL
-  - Usado para adicionar parâmetro `o` (página) à URL
+ - Usado para adicionar parâmetro `o` (página) à URL
 
 **Variáveis de Estado** (resetadas a cada URL):
 - `page`: Número da página atual
@@ -146,6 +156,8 @@ cron.schedule() → runScraper() (periodicamente)
 - `validAds`: Contador de anúncios válidos
 - `adsFound`: Total de anúncios encontrados
 - `nextPage`: Flag para continuar paginação
+- `maxAdsLimit`: Limite de anúncios a processar (pode ser `totalOfAds` ou `MAX_ADS_PER_SEARCH`)
+- `totalOfAds`: Total de anúncios extraído do dataLayer (null se não disponível)
 
 ---
 
@@ -187,9 +199,10 @@ cron.schedule() → runScraper() (periodicamente)
   - Envia notificação se `notify === true`
 
 - `checkPriceChange()`: Detecta alterações de preço
-  - Compara preço atual com preço salvo
-  - Se diferente: atualiza banco
-  - Se redução: calcula percentual e notifica
+ - Compara preço atual com preço salvo
+ - Se diferente: atualiza banco
+ - Se redução maior que 5%: calcula percentual e notifica
+ - Reduções menores que 5% são atualizadas no banco mas não notificadas
 
 ---
 

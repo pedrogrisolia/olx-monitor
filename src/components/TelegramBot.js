@@ -3,7 +3,7 @@ const config = require('../config')
 const $logger = require('./Logger')
 const userRepository = require('../repositories/userRepository')
 const userUrlRepository = require('../repositories/userUrlRepository')
-const { isValidOlxUrl, sanitizeUrl, verifyUrlAccessible } = require('../utils/urlValidator')
+const { isValidOlxUrl, sanitizeUrl } = require("../utils/urlValidator");
 
 let bot = null
 
@@ -75,13 +75,6 @@ const initializeTelegramBot = () => {
 
                 // Sanitiza URL
                 const sanitizedUrl = sanitizeUrl(url)
-
-                // Verifica se é acessível
-                const isAccessible = await verifyUrlAccessible(sanitizedUrl)
-                if (!isAccessible) {
-                    bot.sendMessage(chatId, '❌ URL não acessível. Verifique se a URL está correta.')
-                    return
-                }
 
                 // Verifica se usuário já tem esta URL
                 const alreadyExists = await userUrlRepository.urlExistsForUser(chatId, sanitizedUrl)
