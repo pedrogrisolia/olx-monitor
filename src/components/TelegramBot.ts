@@ -2,6 +2,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import config from '../config';
 import * as userRepository from '../repositories/userRepository';
 import * as userUrlRepository from '../repositories/userUrlRepository';
+import { scraper } from './Scraper';
 import { isValidOlxUrl, sanitizeUrl } from '../utils/urlValidator';
 
 // Logger com interface mínima
@@ -118,7 +119,27 @@ const initializeTelegramBot = (): void => {
         const urlId = await userUrlRepository.createUserUrl(chatId, sanitizedUrl);
         $logger.info(`User ${chatId} added URL: ${sanitizedUrl}`);
 
+        // Mantém a mensagem "clássica" (compatibilidade e UX simples)
         bot!.sendMessage(chatId, `✅ Link adicionado com sucesso! ID: ${urlId}`);
+
+        // Dispara a primeira varredura imediatamente para popular o banco e validar a URL.
+        // Durante testes (NODE_ENV=test), não executa para evitar efeitos colaterais.
+        if (process.env.NODE_ENV !== 'test') {
+          bot!.sendMessage(
+            chatId,
+            '⏳ Fazendo a primeira busca agora (isso pode levar alguns instantes)...'
+          );
+
+          // Não aguardamos aqui para não travar o bot.
+          void scraper({ url: sanitizedUrl, userId: chatId, chatId }).catch((error) => {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            $logger.error('Immediate scrape after /adicionar failed: ' + errorMessage);
+            bot!.sendMessage(
+              chatId,
+              '⚠️ O link foi salvo, mas ocorreu um erro na primeira busca. Vou tentar novamente no próximo ciclo.'
+            );
+          });
+        }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         $logger.error('Error in /adicionar command: ' + errorMessage);

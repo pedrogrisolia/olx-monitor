@@ -1,4 +1,7 @@
 import * as cheerio from 'cheerio';
+import fs from 'fs/promises';
+import path from 'path';
+import crypto from 'crypto';
 import logger from './Logger';
 import httpClient from './HttpClient';
 import * as scraperRepository from '../repositories/scrapperRepository';
@@ -23,6 +26,8 @@ let nextPage = true;
 let maxAdsLimit = MAX_ADS_PER_SEARCH;
 let totalOfAds: number | null = null;
 let currentUrl: string = '';
+
+let firstPageHtml: string | null = null;
 
 /**
  * Informação de URL para o scraper
@@ -50,6 +55,7 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
   nextPage = true;
   maxAdsLimit = MAX_ADS_PER_SEARCH;
   totalOfAds = null;
+  firstPageHtml = null;
 
   // Suporta tanto string simples quanto objeto
   const url = typeof urlInfo === 'string' ? urlInfo : urlInfo.url;
@@ -74,7 +80,18 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
         logger.error('Failed to fetch URL: ' + currentUrl);
         return;
       }
+
+      if (page === 1) {
+        firstPageHtml = response;
+      }
+
       const $ = cheerio.load(response);
+
+      // Se não existir __NEXT_DATA__, salva o HTML para análise (a OLX pode ter mudado ou bloqueado)
+      const nextDataScript = $('script[id="__NEXT_DATA__"]').text();
+      if (!nextDataScript) {
+        await saveHtmlDebug(response, currentUrl, 'missing __NEXT_DATA__');
+      }
 
       // Extrair totalOfAds apenas na primeira iteração
       if (page === 1) {
@@ -99,19 +116,33 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
 
       nextPage = await scrapePage($, searchTerm, notify, url, userId, chatId);
 
+      // Se já na primeira página não encontrou resultados válidos e vai parar, salva HTML
+      if (page === 1 && !nextPage && validAds === 0) {
+        await saveHtmlDebug(response, currentUrl, 'first page returned no ads');
+      }
+
       // Para se atingiu o limite de anúncios válidos
       if (validAds >= maxAdsLimit) {
         logger.info(`Limit of ${maxAdsLimit} valid ads reached. Stopping search.`);
         nextPage = false;
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(error as Error);
+      if (response) {
+        await saveHtmlDebug(response, currentUrl, 'exception: ' + errorMessage);
+      }
       return;
     }
     page++;
   } while (nextPage);
 
   logger.info('Valid ads: ' + validAds);
+
+  // Se não encontrou nenhum anúncio válido, salva o HTML da primeira página para análise.
+  if (validAds === 0 && firstPageHtml) {
+    await saveHtmlDebug(firstPageHtml, setUrlParam(url, 'o', 1), 'validAds=0');
+  }
 
   if (validAds) {
     const averagePrice = sumPrices / validAds;
@@ -129,6 +160,50 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
     };
 
     await scraperRepository.saveLog(scrapperLog);
+  }
+};
+
+/**
+ * Salva o HTML de debug em ../data/debug, com um arquivo .json de metadados.
+ * Útil quando a OLX muda a estrutura/anti-bot e o parser para de encontrar anúncios.
+ */
+const saveHtmlDebug = async (html: string, pageUrl: string, reason: string): Promise<void> => {
+  try {
+    const debugDir = path.resolve(process.cwd(), '../data/debug');
+    await fs.mkdir(debugDir, { recursive: true });
+
+    const hash = crypto.createHash('sha256').update(pageUrl).digest('hex').slice(0, 12);
+    const now = new Date();
+    const stamp = now
+      .toISOString()
+      .replace(/[:.]/g, '-')
+      .replace('T', '_')
+      .replace('Z', '');
+
+    const baseName = `olx-page-${stamp}-${hash}`;
+    const htmlPath = path.join(debugDir, `${baseName}.html`);
+    const metaPath = path.join(debugDir, `${baseName}.json`);
+
+    await fs.writeFile(htmlPath, html, 'utf8');
+    await fs.writeFile(
+      metaPath,
+      JSON.stringify(
+        {
+          savedAt: now.toISOString(),
+          reason,
+          pageUrl,
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    logger.info(`HTML de debug salvo em: ${htmlPath}`);
+  } catch (error) {
+    // Não pode quebrar o scraper só por falha de debug
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.debug('Falha ao salvar HTML de debug: ' + errorMessage);
   }
 };
 

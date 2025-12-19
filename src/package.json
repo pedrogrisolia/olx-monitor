@@ -20,6 +20,7 @@
     "dev": "tsc && nodemon --watch . --ignore dist/** --ignore coverage/** --ext ts,js --exec \"tsc && node dist/bootstrap.js\"",
     "start": "tsc && node dist/bootstrap.js",
     "build": "tsc",
+    "backup:db": "tsc && node dist/scripts/backupDb.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
