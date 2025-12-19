@@ -17,8 +17,8 @@
     "sqlite3": "^5.1.6"
   },
   "scripts": {
-    "dev": "tsc && nodemon --watch . --ignore dist/** --ignore coverage/** --ext ts,js --exec \"tsc && node dist/index.js\"",
-    "start": "tsc && node dist/index.js",
+    "dev": "tsc && nodemon --watch . --ignore dist/** --ignore coverage/** --ext ts,js --exec \"tsc && node dist/bootstrap.js\"",
+    "start": "tsc && node dist/bootstrap.js",
     "build": "tsc",
     "test": "jest",
     "test:watch": "jest --watch",
