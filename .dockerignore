@@ -1,10 +1,12 @@
 ./assets
 ./_extras
 ./src/.env
-./src/config.js
-./src/.env.example
-./src/sample-config.js
+./src/config.ts
+./src/example.env
 ./src/node_modules
+
+# Build artifacts (não necessários para Docker build)
+./src/dist
 
 *.db
 *.sqlite

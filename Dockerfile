@@ -1,13 +1,26 @@
-# Builder Stage
-FROM node:16 AS builder
-WORKDIR /usr/app
-COPY ./src ./
-RUN npm ci --only=production
+# Single-stage build para compatibilidade com módulos nativos (sqlite3)
+FROM node:16-slim
 
-# Final Stage
-FROM node:16-alpine
-ARG NODE_ENV
+# Instalar dependências do sistema necessárias para sqlite3
+RUN apt-get update && apt-get install -y \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/app
-COPY --from=builder /usr/app/ ./
+
+# Copiar package.json e package-lock.json
+COPY ./src/package*.json ./
+
+# Instalar dependências
+RUN npm ci
+
+# Copiar código fonte
+COPY ./src ./
+
+# Compilar TypeScript
+RUN npm run build
+
 EXPOSE 3000
 CMD [ "npm", "start" ]

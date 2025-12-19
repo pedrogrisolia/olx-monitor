@@ -5,3 +5,12 @@ config.js
 *.db
 *.sqlite
 node_modules
+
+# Test artifacts (Jest)
+src/coverage/
+coverage/
+
+# TypeScript build artifacts
+# O build atual gera em src/dist/ (definido em src/tsconfig.json)
+src/dist/
+*.tsbuildinfo

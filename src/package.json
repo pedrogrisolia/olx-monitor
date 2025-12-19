@@ -4,6 +4,8 @@
   "description": "Programa que monitora novos anúncios feitos no OLX, alteração de preços em anúncios existentes e envia notificações pelo Telegram.",
   "main": "index.js",
   "dependencies": {
+    "@types/node-cron": "^3.0.11",
+    "@types/node-telegram-bot-api": "^0.64.13",
     "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.3",
     "cycletls": "^1.0.24",
@@ -15,9 +17,12 @@
     "sqlite3": "^5.1.6"
   },
   "scripts": {
-    "dev": "nodemon index.js",
-    "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsc && nodemon --watch . --ignore dist/** --ignore coverage/** --ext ts,js --exec \"tsc && node dist/index.js\"",
+    "start": "tsc && node dist/index.js",
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "olx",
@@ -29,6 +34,12 @@
   "author": "Augusto Carmo",
   "license": "MIT",
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@types/jest": "^29.5.14",
+    "@types/node": "^16.18.119",
+    "@types/sqlite3": "^3.1.11",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.1",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
   }
 }

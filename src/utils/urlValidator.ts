@@ -1,7 +1,14 @@
-const axios = require('axios')
-const $logger = require('../components/Logger.js')
+import axios from 'axios';
 
-const isValidOlxUrl = (url) => {
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const $logger = require('../components/Logger');
+
+/**
+ * Verifica se uma URL é uma URL válida de busca do OLX Brasil
+ * @param url - URL a ser validada
+ * @returns true se for uma URL válida de busca do OLX
+ */
+export const isValidOlxUrl = (url: string): boolean => {
     try {
         const urlObj = new URL(url)
         
@@ -33,7 +40,12 @@ const isValidOlxUrl = (url) => {
     }
 }
 
-const sanitizeUrl = (url) => {
+/**
+ * Remove parâmetros de tracking de uma URL
+ * @param url - URL a ser sanitizada
+ * @returns URL sem parâmetros de tracking
+ */
+export const sanitizeUrl = (url: string): string => {
     try {
         const urlObj = new URL(url)
         
@@ -49,25 +61,33 @@ const sanitizeUrl = (url) => {
 
         return urlObj.toString()
     } catch (error) {
-        $logger.error('Error sanitizing URL: ' + error.message)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        $logger.error('Error sanitizing URL: ' + errorMessage)
         return url
     }
 }
 
-const verifyUrlAccessible = async (url) => {
+/**
+ * Verifica se uma URL está acessível
+ * @param url - URL a ser verificada
+ * @returns Promise<boolean> - true se a URL estiver acessível
+ */
+export const verifyUrlAccessible = async (url: string): Promise<boolean> => {
     try {
-        const response = await axios.head(url, {
+        await axios.head(url, {
             timeout: 10000,
             maxRedirects: 5,
-            validateStatus: (status) => status >= 200 && status < 400
+            validateStatus: (status: number) => status >= 200 && status < 400
         })
         return true
     } catch (error) {
-        $logger.error('URL not accessible: ' + error.message)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        $logger.error('URL not accessible: ' + errorMessage)
         return false
     }
 }
 
+// Mantém compatibilidade com require() CommonJS
 module.exports = {
     isValidOlxUrl,
     sanitizeUrl,

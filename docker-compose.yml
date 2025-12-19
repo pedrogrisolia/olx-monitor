@@ -5,6 +5,6 @@ services:
     build: .
     restart: unless-stopped
     volumes:
-      - ./src/config.js:/usr/app/config.js
+      - ./src/config.ts:/usr/app/config.ts
       - ./src/.env:/usr/app/.env
       - ./data:/usr/data
