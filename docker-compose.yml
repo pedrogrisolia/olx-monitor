@@ -1,9 +1,10 @@
-version: "3.7"
 services:
 
   olx-monitor:
     build: .
     restart: unless-stopped
+    environment:
+      - TZ=America/Sao_Paulo
     volumes:
       - ./src/config.ts:/usr/app/config.ts
       - ./src/.env:/usr/app/.env

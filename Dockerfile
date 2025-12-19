@@ -1,11 +1,15 @@
 # Single-stage build para compatibilidade com módulos nativos (sqlite3)
-FROM node:16-slim
+# Node 16 (Debian buster) está EOL e pode quebrar o apt-get.
+FROM node:18-bookworm-slim
 
-# Instalar dependências do sistema necessárias para sqlite3
-RUN apt-get update && apt-get install -y \
-    python3 \
-    make \
-    g++ \
+# Instalar dependências do sistema necessárias para sqlite3 e timezone
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        python3 \
+        make \
+        g++ \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/app
