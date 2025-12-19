@@ -23,6 +23,11 @@ RUN npm ci
 # Copiar código fonte
 COPY ./src ./
 
+# O repositório ignora src/config.ts no build (via .dockerignore) para não "bakar" configs locais.
+# Porém o TypeScript precisa do módulo ./config para compilar.
+# Então, durante o build, criamos um config.ts de fallback a partir do sample-config.ts.
+RUN test -f config.ts || cp sample-config.ts config.ts
+
 # Compilar TypeScript
 RUN npm run build
 
