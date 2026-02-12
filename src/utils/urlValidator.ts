@@ -23,14 +23,22 @@ export const isValidOlxUrl = (url: string): boolean => {
             return false
         }
 
-        // Não pode ser URL de anúncio individual (deve ser busca/listagem)
-        // URLs de anúncio geralmente têm formato: /imoveis/.../.../.../.../.../...
-        // URLs de busca têm menos níveis ou parâmetros de busca
         const pathParts = urlObj.pathname.split('/').filter(p => p)
-        
-        // Se tiver muitos níveis, provavelmente é anúncio individual
-        // URLs de busca geralmente têm até 3-4 níveis: /imoveis/estado-rj/rio-de-janeiro-e-regiao
-        if (pathParts.length > 5) {
+
+        // Precisa ter pelo menos um segmento de rota (evita aceitar homepage como busca)
+        if (pathParts.length === 0) {
+            return false
+        }
+
+        // Evita rotas conhecidas de página de detalhe de anúncio
+        if (pathParts[0].toLowerCase() === 'd') {
+            return false
+        }
+
+        // Heurística para detalhe de anúncio: último segmento contendo ID numérico
+        // Exemplos comuns: /.../123456789 ou /.../titulo-do-anuncio-123456789
+        const lastSegment = pathParts[pathParts.length - 1]
+        if (/^\d{6,}$/.test(lastSegment) || /-\d{6,}$/.test(lastSegment)) {
             return false
         }
 

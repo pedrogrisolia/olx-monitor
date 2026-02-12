@@ -43,9 +43,13 @@ describe('urlValidator', () => {
       expect(isValidOlxUrl(url)).toBe(false);
     });
 
-    it('should return false for individual ad URL (too many path segments)', () => {
-      // URLs com mais de 5 segmentos são consideradas de anúncios individuais
+    it('should return false for individual ad URL with numeric ID at end', () => {
       const url = 'https://www.olx.com.br/imoveis/estado/cidade/bairro/tipo/anuncio/123456';
+      expect(isValidOlxUrl(url)).toBe(false);
+    });
+
+    it('should return false for ad detail URL starting with /d/', () => {
+      const url = 'https://www.olx.com.br/d/imoveis/venda/casas/casa-teste-123456789';
       expect(isValidOlxUrl(url)).toBe(false);
     });
 
@@ -58,8 +62,13 @@ describe('urlValidator', () => {
       expect(isValidOlxUrl('')).toBe(false);
     });
 
-    it('should return true for URL with 5 or fewer path segments', () => {
+    it('should return true for valid regional search URL with multiple path segments', () => {
       const url = 'https://www.olx.com.br/imoveis/estado-rj/rio-de-janeiro/zona-sul';
+      expect(isValidOlxUrl(url)).toBe(true);
+    });
+
+    it('should return true for valid OLX URL reported by user', () => {
+      const url = 'https://www.olx.com.br/imoveis/venda/casas/estado-rj/rio-de-janeiro-e-regiao/teresopolis-e-regiao?pe=400000';
       expect(isValidOlxUrl(url)).toBe(true);
     });
 
