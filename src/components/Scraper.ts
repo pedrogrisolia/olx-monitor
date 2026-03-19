@@ -30,6 +30,16 @@ let currentUrl: string = '';
 let firstPageHtml: string | null = null;
 
 /**
+ * Padrões conhecidos de bloqueio Cloudflare em páginas da OLX
+ */
+const CLOUDFLARE_BLOCK_PATTERNS = [
+  /Attention Required!\s*\|\s*Cloudflare/i,
+  /Sorry, you have been blocked/i,
+  /Cloudflare Ray ID/i,
+  /id=["']cf-error-details["']/i,
+];
+
+/**
  * Informação de URL para o scraper
  * Pode ser uma string simples ou objeto com metadados
  */
@@ -83,6 +93,26 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
 
       if (page === 1) {
         firstPageHtml = response;
+      }
+
+      if (isCloudflareBlockedPage(response)) {
+        logger.error(
+          `Cloudflare bloqueou a requisição para ${currentUrl}. Considere usar OLX_PROXY_URL com proxy residencial/mobile BR.`
+        );
+        await saveHtmlDebug(response, currentUrl, 'cloudflare-blocked');
+
+        if (chatId) {
+          try {
+            await notifier.sendNotification(
+              '⚠️ A OLX bloqueou temporariamente o acesso desta busca (Cloudflare). Verifique o IP/proxy de saída (idealmente residencial/mobile BR).',
+              chatId
+            );
+          } catch (error) {
+            logger.error('Could not send Cloudflare block notification: ' + error);
+          }
+        }
+
+        return;
       }
 
       const $ = cheerio.load(response);
@@ -205,6 +235,19 @@ const saveHtmlDebug = async (html: string, pageUrl: string, reason: string): Pro
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.debug('Falha ao salvar HTML de debug: ' + errorMessage);
   }
+};
+
+/**
+ * Detecta se o HTML retornado é uma página de bloqueio da Cloudflare
+ * @param html Conteúdo HTML retornado pela requisição
+ * @returns true se aparenta bloqueio Cloudflare
+ */
+const isCloudflareBlockedPage = (html: string): boolean => {
+  if (!html) {
+    return false;
+  }
+
+  return CLOUDFLARE_BLOCK_PATTERNS.some((pattern) => pattern.test(html));
 };
 
 /**
@@ -411,7 +454,14 @@ const extractTotalOfAds = ($: cheerio.CheerioAPI): number | null => {
 };
 
 // Exporta para TypeScript
-export { scraper, scrapePage, urlAlreadySearched, setUrlParam, extractTotalOfAds };
+export {
+  scraper,
+  scrapePage,
+  urlAlreadySearched,
+  setUrlParam,
+  extractTotalOfAds,
+  isCloudflareBlockedPage,
+};
 
 // Mantém compatibilidade com require() CommonJS
 module.exports = {
@@ -420,4 +470,5 @@ module.exports = {
   urlAlreadySearched,
   setUrlParam,
   extractTotalOfAds,
+  isCloudflareBlockedPage,
 };

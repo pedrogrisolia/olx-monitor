@@ -37,6 +37,22 @@ describe('config.ts', () => {
       const config: Config = require('../config.ts').default;
       expect(Array.isArray(config.urls)).toBe(true);
     });
+
+    it('should have olxProxyUrl as undefined when OLX_PROXY_URL is not set', () => {
+      jest.doMock('dotenv', () => ({ config: jest.fn() }));
+      delete process.env.OLX_PROXY_URL;
+      const config: Config = require('../config.ts').default;
+      expect(config.olxProxyUrl).toBeUndefined();
+    });
+  });
+
+  describe('proxy configuration from environment variable', () => {
+    it('should include olxProxyUrl when OLX_PROXY_URL env var is set', () => {
+      jest.doMock('dotenv', () => ({ config: jest.fn() }));
+      process.env.OLX_PROXY_URL = 'http://user:pass@proxy.example.com:8080';
+      const config: Config = require('../config.ts').default;
+      expect(config.olxProxyUrl).toBe('http://user:pass@proxy.example.com:8080');
+    });
   });
 
   describe('telegram configuration from environment variables', () => {

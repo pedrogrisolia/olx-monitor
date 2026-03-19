@@ -33,7 +33,13 @@ import * as notifier from '../../components/Notifier';
 import httpClient from '../../components/HttpClient';
 import * as scraperRepository from '../../repositories/scrapperRepository';
 import logger from '../../components/Logger';
-import { scraper, scrapePage, extractTotalOfAds, setUrlParam } from '../../components/Scraper';
+import {
+  scraper,
+  scrapePage,
+  extractTotalOfAds,
+  setUrlParam,
+  isCloudflareBlockedPage,
+} from '../../components/Scraper';
 
 // Fixtures de HTML mínimas
 const createHtmlWithNextData = (ads: Array<{ listId: number; subject: string; url: string; price?: string }>) => `
@@ -90,6 +96,20 @@ const createHtmlWithoutNextData = () => `
 <head><title>OLX</title></head>
 <body>
 <div>Página sem dados</div>
+</body>
+</html>
+`;
+
+const createCloudflareBlockHtml = () => `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Attention Required! | Cloudflare</title>
+</head>
+<body>
+  <h1>Sorry, you have been blocked</h1>
+  <div id="cf-error-details"></div>
+  <p>Cloudflare Ray ID: 1234567890abcdef</p>
 </body>
 </html>
 `;
@@ -160,6 +180,24 @@ describe('Scraper', () => {
     });
   });
 
+  describe('isCloudflareBlockedPage', () => {
+    it('deve retornar true para página de bloqueio Cloudflare', () => {
+      const html = createCloudflareBlockHtml();
+
+      const result = isCloudflareBlockedPage(html);
+
+      expect(result).toBe(true);
+    });
+
+    it('deve retornar false para HTML normal da OLX', () => {
+      const html = createHtmlWithNextData([]);
+
+      const result = isCloudflareBlockedPage(html);
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('scrapePage', () => {
     it('deve retornar false quando __NEXT_DATA__ está ausente', async () => {
       const html = createHtmlWithoutNextData();
@@ -223,6 +261,26 @@ describe('Scraper', () => {
   });
 
   describe('scraper - integração', () => {
+    it('deve interromper execução quando Cloudflare bloqueia a página', async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+      (httpClient as jest.Mock).mockResolvedValue(createCloudflareBlockHtml());
+
+      await scraper({
+        url: 'https://www.olx.com.br/imoveis?pe=300000',
+        chatId: '123456789',
+      });
+
+      expect(httpClient).toHaveBeenCalledTimes(1);
+      expect(scraperRepository.saveLog).not.toHaveBeenCalled();
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Cloudflare bloqueou a requisição')
+      );
+      expect(notifier.sendNotification).toHaveBeenCalledWith(
+        expect.stringContaining('A OLX bloqueou temporariamente o acesso desta busca'),
+        '123456789'
+      );
+    });
+
     it('deve parar paginação quando __NEXT_DATA__ está ausente', async () => {
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());

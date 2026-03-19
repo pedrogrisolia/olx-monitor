@@ -14,3 +14,7 @@ coverage/
 # O build atual gera em src/dist/ (definido em src/tsconfig.json)
 src/dist/
 *.tsbuildinfo
+
+# Debug local e artefatos temporários de testes
+data/debug/
+src/jest-results.json

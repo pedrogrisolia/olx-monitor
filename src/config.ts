@@ -19,6 +19,9 @@ const config: Config = {
   // Ferramenta para criar intervalos: https://tool.crontap.com/cronjob-debugger
   interval: '*/5 * * * *',
 
+  // Proxy de saída para OLX (recomendado usar residencial/mobile BR para evitar bloqueios)
+  olxProxyUrl: process.env.OLX_PROXY_URL,
+
   // Configurações do Telegram (opcionais, vindas do .env)
   telegramToken: process.env.TELEGRAM_TOKEN,
   telegramChatID: process.env.TELEGRAM_CHAT_ID,

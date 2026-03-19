@@ -55,8 +55,11 @@ Dentro do repositório tem um arquivo chamado `example.env`, você precisa renom
 
 | Variável          | Exemplo                                |
 | ----------------- | -------------------------------------- |
+| OLX_PROXY_URL     | http://usuario:senha@proxy:porta       |
 | TELEGRAM_TOKEN    | Token do seu bot gerado pelo BotFather |
 | TELEGRAM_CHAT\_ID | ID do seu chat                         |
+
+> **Recomendação:** para reduzir bloqueios da OLX/Cloudflare, use `OLX_PROXY_URL` com saída residencial/mobile no Brasil.
 
 ### O que deve ser monitorado?
 

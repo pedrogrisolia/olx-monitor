@@ -1,6 +1,7 @@
 import logger from './Logger';
 import { getCycleTLSInstance } from './CycleTls';
 import { requestsFingerprints } from '../requestsFingerprints';
+import config from '../config';
 
 /**
  * Headers padrão para as requisições HTTP
@@ -30,6 +31,8 @@ const httpClient = async (url: string): Promise<string | undefined> => {
   const randomRequestFingerprint =
     requestsFingerprints[Math.floor(Math.random() * requestsFingerprints.length)];
 
+  const proxyUrl = config.olxProxyUrl?.trim();
+
   try {
     // Send request
     const response = await cycleTLS(
@@ -38,6 +41,7 @@ const httpClient = async (url: string): Promise<string | undefined> => {
         userAgent: randomRequestFingerprint[0],
         ja3: randomRequestFingerprint[1],
         headers,
+        ...(proxyUrl ? { proxy: proxyUrl } : {}),
       },
       'get'
     );

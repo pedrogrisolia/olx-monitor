@@ -48,6 +48,8 @@ export interface Config {
   urls: string[];
   /** Intervalo de execução em formato cron */
   interval: string;
+  /** Proxy de saída para requests OLX (recomendado residencial/mobile BR) */
+  olxProxyUrl?: string;
   /** Token do bot Telegram (opcional) */
   telegramToken?: string;
   /** ID do chat Telegram (opcional) */
