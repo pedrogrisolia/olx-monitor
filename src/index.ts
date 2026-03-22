@@ -4,7 +4,8 @@ import { initializeCycleTLS } from './components/CycleTls';
 import { scraper } from './components/Scraper';
 import { createTables } from './database/database';
 import { initializeTelegramBot } from './components/TelegramBot';
-import * as userUrlRepository from './repositories/userUrlRepository';
+import { logStartupUsersSummary } from "./components/StartupSummary";
+import * as userUrlRepository from "./repositories/userUrlRepository";
 
 // Logger com interface mínima
 interface Logger {
@@ -13,7 +14,7 @@ interface Logger {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const $logger: Logger = require('./components/Logger');
+const $logger: Logger = require("./components/Logger");
 
 /**
  * Executa o scraper para todas as URLs ativas dos usuários
@@ -22,7 +23,7 @@ const runScraper = async (): Promise<void> => {
   const userUrls = await userUrlRepository.getAllActiveUrls();
 
   if (userUrls.length === 0) {
-    $logger.info('Nenhuma URL para monitorar. Adicione URLs via bot.');
+    $logger.info("Nenhuma URL para monitorar. Adicione URLs via bot.");
     return;
   }
 
@@ -34,7 +35,8 @@ const runScraper = async (): Promise<void> => {
         chatId: urlInfo.chatId,
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       $logger.error(errorMessage);
     }
   }
@@ -44,8 +46,16 @@ const runScraper = async (): Promise<void> => {
  * Função principal de inicialização
  */
 const main = async (): Promise<void> => {
-  $logger.info('Program started');
+  $logger.info("Program started");
   await createTables();
+  try {
+    await logStartupUsersSummary();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    $logger.error(
+      "Falha ao gerar resumo inicial de usuários/URLs: " + errorMessage,
+    );
+  }
   await initializeCycleTLS();
   initializeTelegramBot();
   runScraper();

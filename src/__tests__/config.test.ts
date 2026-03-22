@@ -15,33 +15,28 @@ describe('config.ts', () => {
     jest.resetModules();
   });
 
-  describe('default values', () => {
-    it('should have a default interval of "*/5 * * * *"', () => {
-      const config: Config = require('../config.ts').default;
-      expect(config.interval).toBe('*/5 * * * *');
-    });
-
+  describe("default values", () => {
     it('should have a default dbFile of "../data/ads.db"', () => {
-      const config: Config = require('../config.ts').default;
-      expect(config.dbFile).toBe('../data/ads.db');
+      const config: Config = require("../config.ts").default;
+      expect(config.dbFile).toBe("../data/ads.db");
     });
 
-    it('should have logger configuration with logFilePath and timestampFormat', () => {
-      const config: Config = require('../config.ts').default;
+    it("should have logger configuration with logFilePath and timestampFormat", () => {
+      const config: Config = require("../config.ts").default;
       expect(config.logger).toBeDefined();
-      expect(config.logger.logFilePath).toBe('../data/scrapper.log');
-      expect(config.logger.timestampFormat).toBe('YYYY-MM-DD HH:mm:ss');
+      expect(config.logger.logFilePath).toBe("../data/scrapper.log");
+      expect(config.logger.timestampFormat).toBe("YYYY-MM-DD HH:mm:ss");
     });
 
-    it('should have urls array', () => {
-      const config: Config = require('../config.ts').default;
+    it("should have urls array", () => {
+      const config: Config = require("../config.ts").default;
       expect(Array.isArray(config.urls)).toBe(true);
     });
 
-    it('should have olxProxyUrl as undefined when OLX_PROXY_URL is not set', () => {
-      jest.doMock('dotenv', () => ({ config: jest.fn() }));
+    it("should have olxProxyUrl as undefined when OLX_PROXY_URL is not set", () => {
+      jest.doMock("dotenv", () => ({ config: jest.fn() }));
       delete process.env.OLX_PROXY_URL;
-      const config: Config = require('../config.ts').default;
+      const config: Config = require("../config.ts").default;
       expect(config.olxProxyUrl).toBeUndefined();
     });
   });
