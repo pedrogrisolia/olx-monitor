@@ -17,32 +17,39 @@ jest.mock('../../components/Notifier', () => ({
 
 jest.mock('../../components/HttpClient', () => jest.fn());
 
-jest.mock('../../repositories/scrapperRepository', () => ({
+jest.mock("../../components/ProxyValidator", () => ({
+  assertProxyIsWorking: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("../../repositories/scrapperRepository", () => ({
   saveLog: jest.fn().mockResolvedValue(undefined),
   getLogsByUrl: jest.fn(),
 }));
 
-jest.mock('../../repositories/adRepository', () => ({
-  getAd: jest.fn().mockRejectedValue('No ad with this ID was found'),
+jest.mock("../../repositories/adRepository", () => ({
+  getAd: jest.fn().mockRejectedValue("No ad with this ID was found"),
   createAd: jest.fn().mockResolvedValue(undefined),
   updateAd: jest.fn().mockResolvedValue(true),
 }));
 
-import * as cheerio from 'cheerio';
-import * as notifier from '../../components/Notifier';
-import httpClient from '../../components/HttpClient';
-import * as scraperRepository from '../../repositories/scrapperRepository';
-import logger from '../../components/Logger';
+import * as cheerio from "cheerio";
+import * as notifier from "../../components/Notifier";
+import httpClient from "../../components/HttpClient";
+import { assertProxyIsWorking } from "../../components/ProxyValidator";
+import * as scraperRepository from "../../repositories/scrapperRepository";
+import logger from "../../components/Logger";
 import {
   scraper,
   scrapePage,
   extractTotalOfAds,
   setUrlParam,
   isCloudflareBlockedPage,
-} from '../../components/Scraper';
+} from "../../components/Scraper";
 
 // Fixtures de HTML mínimas
-const createHtmlWithNextData = (ads: Array<{ listId: number; subject: string; url: string; price?: string }>) => `
+const createHtmlWithNextData = (
+  ads: Array<{ listId: number; subject: string; url: string; price?: string }>,
+) => `
 <!DOCTYPE html>
 <html>
 <head><title>OLX</title></head>
@@ -51,9 +58,9 @@ const createHtmlWithNextData = (ads: Array<{ listId: number; subject: string; ur
 ${JSON.stringify({
   props: {
     pageProps: {
-      ads: ads
-    }
-  }
+      ads: ads,
+    },
+  },
 })}
 </script>
 </body>
@@ -80,10 +87,15 @@ ${JSON.stringify({
   props: {
     pageProps: {
       ads: [
-        { listId: 1, subject: 'Anúncio 1', url: 'https://olx.com.br/1', price: 'R$ 100.000' }
-      ]
-    }
-  }
+        {
+          listId: 1,
+          subject: "Anúncio 1",
+          url: "https://olx.com.br/1",
+          price: "R$ 100.000",
+        },
+      ],
+    },
+  },
 })}
 </script>
 </body>
@@ -123,22 +135,24 @@ const createHtmlWithEmptyAds = () => `
 ${JSON.stringify({
   props: {
     pageProps: {
-      ads: []
-    }
-  }
+      ads: [],
+    },
+  },
 })}
 </script>
 </body>
 </html>
 `;
 
-describe('Scraper', () => {
+describe("Scraper", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (assertProxyIsWorking as jest.Mock).mockReset();
+    (assertProxyIsWorking as jest.Mock).mockResolvedValue(undefined);
   });
 
-  describe('extractTotalOfAds', () => {
-    it('deve extrair totalOfAds do datalayer corretamente', () => {
+  describe("extractTotalOfAds", () => {
+    it("deve extrair totalOfAds do datalayer corretamente", () => {
       const html = createHtmlWithDataLayer(150);
       const $ = cheerio.load(html);
 
@@ -147,7 +161,7 @@ describe('Scraper', () => {
       expect(result).toBe(150);
     });
 
-    it('deve retornar null quando datalayer não existe', () => {
+    it("deve retornar null quando datalayer não existe", () => {
       const html = createHtmlWithNextData([]);
       const $ = cheerio.load(html);
 
@@ -156,7 +170,7 @@ describe('Scraper', () => {
       expect(result).toBeNull();
     });
 
-    it('deve retornar null quando datalayer não contém totalOfAds', () => {
+    it("deve retornar null quando datalayer não contém totalOfAds", () => {
       const html = `
         <!DOCTYPE html>
         <html>
@@ -180,8 +194,8 @@ describe('Scraper', () => {
     });
   });
 
-  describe('isCloudflareBlockedPage', () => {
-    it('deve retornar true para página de bloqueio Cloudflare', () => {
+  describe("isCloudflareBlockedPage", () => {
+    it("deve retornar true para página de bloqueio Cloudflare", () => {
       const html = createCloudflareBlockHtml();
 
       const result = isCloudflareBlockedPage(html);
@@ -189,7 +203,7 @@ describe('Scraper', () => {
       expect(result).toBe(true);
     });
 
-    it('deve retornar false para HTML normal da OLX', () => {
+    it("deve retornar false para HTML normal da OLX", () => {
       const html = createHtmlWithNextData([]);
 
       const result = isCloudflareBlockedPage(html);
@@ -198,94 +212,143 @@ describe('Scraper', () => {
     });
   });
 
-  describe('scrapePage', () => {
-    it('deve retornar false quando __NEXT_DATA__ está ausente', async () => {
+  describe("scrapePage", () => {
+    it("deve retornar false quando __NEXT_DATA__ está ausente", async () => {
       const html = createHtmlWithoutNextData();
       const $ = cheerio.load(html);
 
-      const result = await scrapePage($, 'apartamento', true, 'https://olx.com.br/busca');
+      const result = await scrapePage(
+        $,
+        "apartamento",
+        true,
+        "https://olx.com.br/busca",
+      );
 
       expect(result).toBe(false);
     });
 
-    it('deve retornar false quando lista de ads está vazia', async () => {
+    it("deve retornar false quando lista de ads está vazia", async () => {
       const html = createHtmlWithEmptyAds();
       const $ = cheerio.load(html);
 
-      const result = await scrapePage($, 'apartamento', true, 'https://olx.com.br/busca');
+      const result = await scrapePage(
+        $,
+        "apartamento",
+        true,
+        "https://olx.com.br/busca",
+      );
 
       expect(result).toBe(false);
     });
 
-    it('deve retornar true quando existem anúncios para processar', async () => {
+    it("deve retornar true quando existem anúncios para processar", async () => {
       const html = createHtmlWithNextData([
-        { listId: 123, subject: 'Casa Centro', url: 'https://olx.com.br/123', price: 'R$ 200.000' },
-        { listId: 456, subject: 'Apartamento', url: 'https://olx.com.br/456', price: 'R$ 150.000' },
+        {
+          listId: 123,
+          subject: "Casa Centro",
+          url: "https://olx.com.br/123",
+          price: "R$ 200.000",
+        },
+        {
+          listId: 456,
+          subject: "Apartamento",
+          url: "https://olx.com.br/456",
+          price: "R$ 150.000",
+        },
       ]);
       const $ = cheerio.load(html);
 
-      const result = await scrapePage($, 'imoveis', false, 'https://olx.com.br/busca');
+      const result = await scrapePage(
+        $,
+        "imoveis",
+        false,
+        "https://olx.com.br/busca",
+      );
 
       expect(result).toBe(true);
-      expect(logger.info).toHaveBeenCalledWith('Checking new ads for: imoveis');
+      expect(logger.info).toHaveBeenCalledWith("Checking new ads for: imoveis");
     });
 
-    it('deve processar preços corretamente', async () => {
+    it("deve processar preços corretamente", async () => {
       const html = createHtmlWithNextData([
-        { listId: 789, subject: 'Terreno', url: 'https://olx.com.br/789', price: 'R$ 50.000' },
+        {
+          listId: 789,
+          subject: "Terreno",
+          url: "https://olx.com.br/789",
+          price: "R$ 50.000",
+        },
       ]);
       const $ = cheerio.load(html);
 
-      await scrapePage($, 'terreno', true, 'https://olx.com.br/busca');
+      await scrapePage($, "terreno", true, "https://olx.com.br/busca");
 
-      expect(logger.debug).toHaveBeenCalledWith('Checking ad: 1');
+      expect(logger.debug).toHaveBeenCalledWith("Checking ad: 1");
     });
   });
 
-  describe('setUrlParam', () => {
-    it('deve adicionar parâmetro de página à URL', () => {
-      const url = 'https://www.olx.com.br/imoveis?pe=300000';
-      const result = setUrlParam(url, 'o', 2);
+  describe("setUrlParam", () => {
+    it("deve adicionar parâmetro de página à URL", () => {
+      const url = "https://www.olx.com.br/imoveis?pe=300000";
+      const result = setUrlParam(url, "o", 2);
 
-      expect(result).toContain('o=2');
-      expect(result).toContain('pe=300000');
+      expect(result).toContain("o=2");
+      expect(result).toContain("pe=300000");
     });
 
-    it('deve substituir parâmetro existente', () => {
-      const url = 'https://www.olx.com.br/imoveis?o=1&pe=300000';
-      const result = setUrlParam(url, 'o', 5);
+    it("deve substituir parâmetro existente", () => {
+      const url = "https://www.olx.com.br/imoveis?o=1&pe=300000";
+      const result = setUrlParam(url, "o", 5);
 
-      expect(result).toContain('o=5');
-      expect(result).not.toContain('o=1');
+      expect(result).toContain("o=5");
+      expect(result).not.toContain("o=1");
     });
   });
 
-  describe('scraper - integração', () => {
-    it('deve interromper execução quando Cloudflare bloqueia a página', async () => {
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+  describe("scraper - integração", () => {
+    it("deve lançar exceção quando o proxy não está funcionando", async () => {
+      (assertProxyIsWorking as jest.Mock).mockRejectedValue(
+        new Error("Proxy offline"),
+      );
+
+      await expect(
+        scraper("https://www.olx.com.br/imoveis?pe=300000"),
+      ).rejects.toThrow("Proxy offline");
+
+      expect(httpClient).not.toHaveBeenCalled();
+      expect(scraperRepository.getLogsByUrl).not.toHaveBeenCalled();
+    });
+
+    it("deve interromper execução quando Cloudflare bloqueia a página", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
       (httpClient as jest.Mock).mockResolvedValue(createCloudflareBlockHtml());
 
       await scraper({
-        url: 'https://www.olx.com.br/imoveis?pe=300000',
-        chatId: '123456789',
+        url: "https://www.olx.com.br/imoveis?pe=300000",
+        chatId: "123456789",
       });
 
       expect(httpClient).toHaveBeenCalledTimes(1);
       expect(scraperRepository.saveLog).not.toHaveBeenCalled();
       expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Cloudflare bloqueou a requisição')
+        expect.stringContaining("Cloudflare bloqueou a requisição"),
       );
       expect(notifier.sendNotification).toHaveBeenCalledWith(
-        expect.stringContaining('A OLX bloqueou temporariamente o acesso desta busca'),
-        '123456789'
+        expect.stringContaining(
+          "A OLX bloqueou temporariamente o acesso desta busca",
+        ),
+        "123456789",
       );
     });
 
-    it('deve parar paginação quando __NEXT_DATA__ está ausente', async () => {
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+    it("deve parar paginação quando __NEXT_DATA__ está ausente", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
 
-      await scraper('https://www.olx.com.br/imoveis?pe=300000');
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
 
       // Deve ter feito apenas 1 requisição
       expect(httpClient).toHaveBeenCalledTimes(1);
@@ -293,48 +356,64 @@ describe('Scraper', () => {
       expect(scraperRepository.saveLog).not.toHaveBeenCalled();
     });
 
-    it('deve enviar notificação inicial na primeira execução com totalOfAds', async () => {
+    it("deve enviar notificação inicial na primeira execução com totalOfAds", async () => {
       // Simula primeira execução (URL não encontrada nos logs)
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithDataLayer(50));
 
       await scraper({
-        url: 'https://www.olx.com.br/imoveis?pe=300000',
-        chatId: '123456789',
+        url: "https://www.olx.com.br/imoveis?pe=300000",
+        chatId: "123456789",
       });
 
       expect(notifier.sendNotification).toHaveBeenCalledWith(
-        expect.stringContaining('🔍 Foram encontrados 50 anúncios para essa busca'),
-        '123456789'
+        expect.stringContaining(
+          "🔍 Foram encontrados 50 anúncios para essa busca",
+        ),
+        "123456789",
       );
     });
 
-    it('não deve enviar notificação inicial se não for primeira execução', async () => {
+    it("não deve enviar notificação inicial se não for primeira execução", async () => {
       // Simula URL já pesquisada antes
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
       (httpClient as jest.Mock)
         .mockResolvedValueOnce(createHtmlWithDataLayer(50))
         .mockResolvedValueOnce(createHtmlWithEmptyAds());
 
       await scraper({
-        url: 'https://www.olx.com.br/imoveis?pe=300000',
-        chatId: '123456789',
+        url: "https://www.olx.com.br/imoveis?pe=300000",
+        chatId: "123456789",
       });
 
       // Não deve ter chamado a notificação inicial (pode ter chamado outras)
       const calls = (notifier.sendNotification as jest.Mock).mock.calls;
-      const initialNotificationCalls = calls.filter(
-        (call: string[]) => call[0].includes('🔍 Foram encontrados')
+      const initialNotificationCalls = calls.filter((call: string[]) =>
+        call[0].includes("🔍 Foram encontrados"),
       );
       expect(initialNotificationCalls.length).toBe(0);
     });
 
-    it('deve processar anúncios e salvar log com estatísticas', async () => {
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+    it("deve processar anúncios e salvar log com estatísticas", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
 
       const htmlPage1 = createHtmlWithNextData([
-        { listId: 1, subject: 'Casa 1', url: 'https://olx.com.br/1', price: 'R$ 100.000' },
-        { listId: 2, subject: 'Casa 2', url: 'https://olx.com.br/2', price: 'R$ 200.000' },
+        {
+          listId: 1,
+          subject: "Casa 1",
+          url: "https://olx.com.br/1",
+          price: "R$ 100.000",
+        },
+        {
+          listId: 2,
+          subject: "Casa 2",
+          url: "https://olx.com.br/2",
+          price: "R$ 200.000",
+        },
       ]);
       const htmlPage2 = createHtmlWithEmptyAds();
 
@@ -342,10 +421,10 @@ describe('Scraper', () => {
         .mockResolvedValueOnce(htmlPage1)
         .mockResolvedValueOnce(htmlPage2);
 
-      await scraper('https://www.olx.com.br/imoveis?pe=300000');
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
 
       expect(scraperRepository.saveLog).toHaveBeenCalledWith({
-        url: 'https://www.olx.com.br/imoveis?pe=300000',
+        url: "https://www.olx.com.br/imoveis?pe=300000",
         adsFound: 2,
         averagePrice: 150000,
         minPrice: 100000,
@@ -353,60 +432,81 @@ describe('Scraper', () => {
       });
     });
 
-    it('deve suportar URL como string simples', async () => {
+    it("deve suportar URL como string simples", async () => {
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
 
-      await scraper('https://www.olx.com.br/imoveis');
+      await scraper("https://www.olx.com.br/imoveis");
 
       expect(httpClient).toHaveBeenCalled();
       expect(logger.info).toHaveBeenCalledWith(
-        expect.stringContaining('First run for URL')
+        expect.stringContaining("First run for URL"),
       );
     });
 
-    it('deve suportar URL como objeto com metadados', async () => {
+    it("deve suportar URL como objeto com metadados", async () => {
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
 
       await scraper({
-        url: 'https://www.olx.com.br/imoveis',
+        url: "https://www.olx.com.br/imoveis",
         userId: 42,
-        chatId: '123456789',
+        chatId: "123456789",
       });
 
       expect(httpClient).toHaveBeenCalled();
     });
 
-    it('deve tratar erro quando httpClient retorna undefined', async () => {
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+    it("deve tratar erro quando httpClient retorna undefined", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
       (httpClient as jest.Mock).mockResolvedValue(undefined);
 
-      await scraper('https://www.olx.com.br/imoveis');
+      await scraper("https://www.olx.com.br/imoveis");
 
-      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('Failed to fetch URL'));
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to fetch URL"),
+      );
     });
   });
 
-  describe('scraper - logs de estatísticas', () => {
-    it('deve logar preços máximo, mínimo e médio', async () => {
-      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([{ id: 1 }]);
+  describe("scraper - logs de estatísticas", () => {
+    it("deve logar preços máximo, mínimo e médio", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
 
       const html = createHtmlWithNextData([
-        { listId: 1, subject: 'Casa Barata', url: 'https://olx.com.br/1', price: 'R$ 50.000' },
-        { listId: 2, subject: 'Casa Média', url: 'https://olx.com.br/2', price: 'R$ 100.000' },
-        { listId: 3, subject: 'Casa Cara', url: 'https://olx.com.br/3', price: 'R$ 150.000' },
+        {
+          listId: 1,
+          subject: "Casa Barata",
+          url: "https://olx.com.br/1",
+          price: "R$ 50.000",
+        },
+        {
+          listId: 2,
+          subject: "Casa Média",
+          url: "https://olx.com.br/2",
+          price: "R$ 100.000",
+        },
+        {
+          listId: 3,
+          subject: "Casa Cara",
+          url: "https://olx.com.br/3",
+          price: "R$ 150.000",
+        },
       ]);
 
       (httpClient as jest.Mock)
         .mockResolvedValueOnce(html)
         .mockResolvedValueOnce(createHtmlWithEmptyAds());
 
-      await scraper('https://www.olx.com.br/imoveis');
+      await scraper("https://www.olx.com.br/imoveis");
 
-      expect(logger.info).toHaveBeenCalledWith('Maximum price: 150000');
-      expect(logger.info).toHaveBeenCalledWith('Minimum price: 50000');
-      expect(logger.info).toHaveBeenCalledWith('Average price: 100000');
+      expect(logger.info).toHaveBeenCalledWith("Maximum price: 150000");
+      expect(logger.info).toHaveBeenCalledWith("Minimum price: 50000");
+      expect(logger.info).toHaveBeenCalledWith("Average price: 100000");
     });
   });
 });

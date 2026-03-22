@@ -4,9 +4,10 @@ import path from 'path';
 import crypto from 'crypto';
 import logger from './Logger';
 import httpClient from './HttpClient';
-import * as scraperRepository from '../repositories/scrapperRepository';
-import * as notifier from './Notifier';
-import Ad from './Ad';
+import { assertProxyIsWorking } from "./ProxyValidator";
+import * as scraperRepository from "../repositories/scrapperRepository";
+import * as notifier from "./Notifier";
+import Ad from "./Ad";
 
 /**
  * Limite máximo de anúncios por busca
@@ -25,7 +26,7 @@ let adsFound = 0;
 let nextPage = true;
 let maxAdsLimit = MAX_ADS_PER_SEARCH;
 let totalOfAds: number | null = null;
-let currentUrl: string = '';
+let currentUrl: string = "";
 
 let firstPageHtml: string | null = null;
 
@@ -68,12 +69,15 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
   firstPageHtml = null;
 
   // Suporta tanto string simples quanto objeto
-  const url = typeof urlInfo === 'string' ? urlInfo : urlInfo.url;
-  const userId = typeof urlInfo === 'object' ? urlInfo.userId : null;
-  const chatId = typeof urlInfo === 'object' ? urlInfo.chatId : null;
+  const url = typeof urlInfo === "string" ? urlInfo : urlInfo.url;
+  const userId = typeof urlInfo === "object" ? urlInfo.userId : null;
+  const chatId = typeof urlInfo === "object" ? urlInfo.chatId : null;
+
+  // Valida proxy (quando configurado) antes de iniciar scraping
+  await assertProxyIsWorking();
 
   const parsedUrl = new URL(url);
-  const searchTerm = parsedUrl.searchParams.get('q') || '';
+  const searchTerm = parsedUrl.searchParams.get("q") || "";
   const notify = await urlAlreadySearched(url);
   if (!notify) {
     logger.info(`First run for URL ${url} - notifications disabled`);
@@ -82,12 +86,12 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
   }
 
   do {
-    currentUrl = setUrlParam(url, 'o', page);
+    currentUrl = setUrlParam(url, "o", page);
     let response: string | undefined;
     try {
       response = await httpClient(currentUrl);
       if (!response) {
-        logger.error('Failed to fetch URL: ' + currentUrl);
+        logger.error("Failed to fetch URL: " + currentUrl);
         return;
       }
 
@@ -97,18 +101,20 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
 
       if (isCloudflareBlockedPage(response)) {
         logger.error(
-          `Cloudflare bloqueou a requisição para ${currentUrl}. Considere usar OLX_PROXY_URL com proxy residencial/mobile BR.`
+          `Cloudflare bloqueou a requisição para ${currentUrl}. Considere usar OLX_PROXY_URL com proxy residencial/mobile BR.`,
         );
-        await saveHtmlDebug(response, currentUrl, 'cloudflare-blocked');
+        await saveHtmlDebug(response, currentUrl, "cloudflare-blocked");
 
         if (chatId) {
           try {
             await notifier.sendNotification(
-              '⚠️ A OLX bloqueou temporariamente o acesso desta busca (Cloudflare). Verifique o IP/proxy de saída (idealmente residencial/mobile BR).',
-              chatId
+              "⚠️ A OLX bloqueou temporariamente o acesso desta busca (Cloudflare). Verifique o IP/proxy de saída (idealmente residencial/mobile BR).",
+              chatId,
             );
           } catch (error) {
-            logger.error('Could not send Cloudflare block notification: ' + error);
+            logger.error(
+              "Could not send Cloudflare block notification: " + error,
+            );
           }
         }
 
@@ -120,7 +126,7 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
       // Se não existir __NEXT_DATA__, salva o HTML para análise (a OLX pode ter mudado ou bloqueado)
       const nextDataScript = $('script[id="__NEXT_DATA__"]').text();
       if (!nextDataScript) {
-        await saveHtmlDebug(response, currentUrl, 'missing __NEXT_DATA__');
+        await saveHtmlDebug(response, currentUrl, "missing __NEXT_DATA__");
       }
 
       // Extrair totalOfAds apenas na primeira iteração
@@ -129,8 +135,11 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
         if (totalAds) {
           totalOfAds = totalAds;
           // Usa MAX_ADS_PER_SEARCH se totalOfAds for maior que o limite
-          maxAdsLimit = totalAds > MAX_ADS_PER_SEARCH ? MAX_ADS_PER_SEARCH : totalAds;
-          logger.info(`Total ads found: ${totalOfAds}, using limit: ${maxAdsLimit}`);
+          maxAdsLimit =
+            totalAds > MAX_ADS_PER_SEARCH ? MAX_ADS_PER_SEARCH : totalAds;
+          logger.info(
+            `Total ads found: ${totalOfAds}, using limit: ${maxAdsLimit}`,
+          );
 
           // Notificar se for primeira execução e houver totalOfAds
           if (!notify && totalOfAds) {
@@ -138,7 +147,7 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
             try {
               await notifier.sendNotification(msg, chatId);
             } catch (error) {
-              logger.error('Could not send initial notification: ' + error);
+              logger.error("Could not send initial notification: " + error);
             }
           }
         }
@@ -148,38 +157,41 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
 
       // Se já na primeira página não encontrou resultados válidos e vai parar, salva HTML
       if (page === 1 && !nextPage && validAds === 0) {
-        await saveHtmlDebug(response, currentUrl, 'first page returned no ads');
+        await saveHtmlDebug(response, currentUrl, "first page returned no ads");
       }
 
       // Para se atingiu o limite de anúncios válidos
       if (validAds >= maxAdsLimit) {
-        logger.info(`Limit of ${maxAdsLimit} valid ads reached. Stopping search.`);
+        logger.info(
+          `Limit of ${maxAdsLimit} valid ads reached. Stopping search.`,
+        );
         nextPage = false;
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       logger.error(error as Error);
       if (response) {
-        await saveHtmlDebug(response, currentUrl, 'exception: ' + errorMessage);
+        await saveHtmlDebug(response, currentUrl, "exception: " + errorMessage);
       }
       return;
     }
     page++;
   } while (nextPage);
 
-  logger.info('Valid ads: ' + validAds);
+  logger.info("Valid ads: " + validAds);
 
   // Se não encontrou nenhum anúncio válido, salva o HTML da primeira página para análise.
   if (validAds === 0 && firstPageHtml) {
-    await saveHtmlDebug(firstPageHtml, setUrlParam(url, 'o', 1), 'validAds=0');
+    await saveHtmlDebug(firstPageHtml, setUrlParam(url, "o", 1), "validAds=0");
   }
 
   if (validAds) {
     const averagePrice = sumPrices / validAds;
 
-    logger.info('Maximum price: ' + maxPrice);
-    logger.info('Minimum price: ' + minPrice);
-    logger.info('Average price: ' + sumPrices / validAds);
+    logger.info("Maximum price: " + maxPrice);
+    logger.info("Minimum price: " + minPrice);
+    logger.info("Average price: " + sumPrices / validAds);
 
     const scrapperLog = {
       url,
