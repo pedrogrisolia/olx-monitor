@@ -145,10 +145,24 @@ ${JSON.stringify({
 `;
 
 describe("Scraper", () => {
+  let setTimeoutSpy: jest.SpyInstance;
+
   beforeEach(() => {
     jest.clearAllMocks();
     (assertProxyIsWorking as jest.Mock).mockReset();
     (assertProxyIsWorking as jest.Mock).mockResolvedValue(undefined);
+    setTimeoutSpy = jest
+      .spyOn(global, "setTimeout")
+      .mockImplementation(
+        ((callback: (...args: unknown[]) => void) => {
+          callback();
+          return 0 as unknown as NodeJS.Timeout;
+        }) as typeof setTimeout,
+      );
+  });
+
+  afterEach(() => {
+    setTimeoutSpy.mockRestore();
   });
 
   describe("extractTotalOfAds", () => {
@@ -423,6 +437,7 @@ describe("Scraper", () => {
 
       await scraper("https://www.olx.com.br/imoveis?pe=300000");
 
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 15000);
       expect(scraperRepository.saveLog).toHaveBeenCalledWith({
         url: "https://www.olx.com.br/imoveis?pe=300000",
         adsFound: 2,
