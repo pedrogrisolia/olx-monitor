@@ -13,6 +13,7 @@ import Ad from "./Ad";
  * Limite máximo de anúncios por busca
  */
 const MAX_ADS_PER_SEARCH = 500;
+const NEXT_PAGE_DELAY_MS = 15000;
 
 /**
  * Variáveis de estado do scraper (resetadas a cada URL)
@@ -175,6 +176,9 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
         await saveHtmlDebug(response, currentUrl, "exception: " + errorMessage);
       }
       return;
+    }
+    if (nextPage) {
+      await new Promise((resolve) => setTimeout(resolve, NEXT_PAGE_DELAY_MS));
     }
     page++;
   } while (nextPage);
