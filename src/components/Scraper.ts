@@ -13,7 +13,7 @@ import Ad from "./Ad";
  * Limite máximo de anúncios por busca
  */
 const MAX_ADS_PER_SEARCH = 500;
-const NEXT_PAGE_DELAY_MS = 15000;
+const NEXT_PAGE_DELAY_MS = 30000;
 
 /**
  * Variáveis de estado do scraper (resetadas a cada URL)
@@ -105,19 +105,6 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
           `Cloudflare bloqueou a requisição para ${currentUrl}. Considere usar OLX_PROXY_URL com proxy residencial/mobile BR.`,
         );
         await saveHtmlDebug(response, currentUrl, "cloudflare-blocked");
-
-        if (chatId) {
-          try {
-            await notifier.sendNotification(
-              "⚠️ A OLX bloqueou temporariamente o acesso desta busca (Cloudflare). Verifique o IP/proxy de saída (idealmente residencial/mobile BR).",
-              chatId,
-            );
-          } catch (error) {
-            logger.error(
-              "Could not send Cloudflare block notification: " + error,
-            );
-          }
-        }
 
         return;
       }

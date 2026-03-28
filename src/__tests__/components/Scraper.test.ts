@@ -348,12 +348,7 @@ describe("Scraper", () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining("Cloudflare bloqueou a requisição"),
       );
-      expect(notifier.sendNotification).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "A OLX bloqueou temporariamente o acesso desta busca",
-        ),
-        "123456789",
-      );
+      expect(notifier.sendNotification).not.toHaveBeenCalled();
     });
 
     it("deve parar paginação quando __NEXT_DATA__ está ausente", async () => {
@@ -437,7 +432,7 @@ describe("Scraper", () => {
 
       await scraper("https://www.olx.com.br/imoveis?pe=300000");
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 15000);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30000);
       expect(scraperRepository.saveLog).toHaveBeenCalledWith({
         url: "https://www.olx.com.br/imoveis?pe=300000",
         adsFound: 2,

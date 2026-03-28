@@ -6,10 +6,17 @@ import { createTables } from './database/database';
 import { initializeTelegramBot } from './components/TelegramBot';
 import { logStartupUsersSummary } from "./components/StartupSummary";
 import * as userUrlRepository from "./repositories/userUrlRepository";
+import {
+  applyExtractionWindowToCron,
+  EXTRACTION_WINDOW_LABEL,
+  isValidCronExpression,
+  shouldRunScraperNow,
+} from "./utils/scraperSchedule";
 
 // Logger com interface mínima
 interface Logger {
   info: (message: string) => void;
+  warn: (message: string) => void;
   error: (message: string | Error) => void;
 }
 
@@ -20,6 +27,15 @@ const $logger: Logger = require("./components/Logger");
  * Executa o scraper para todas as URLs ativas dos usuários
  */
 const runScraper = async (): Promise<void> => {
+  // Guarda defensiva para chamadas manuais e fallback quando config.interval é inválido.
+  // Em operação normal, o cron já restringe a execução à janela de extração.
+  if (!shouldRunScraperNow()) {
+    $logger.info(
+      `Fora da janela de extração (${EXTRACTION_WINDOW_LABEL}). Execução do scraper ignorada.`,
+    );
+    return;
+  }
+
   const userUrls = await userUrlRepository.getAllActiveUrls();
 
   if (userUrls.length === 0) {
@@ -65,6 +81,18 @@ const main = async (): Promise<void> => {
 main();
 
 // Agendamento de execuções periódicas
-cron.schedule(config.interval, () => {
+const isCronValid = isValidCronExpression(config.interval);
+const scheduleExpression = isCronValid
+  ? applyExtractionWindowToCron(config.interval)
+  : config.interval;
+if (!isCronValid) {
+  $logger.warn(
+    `Expressão cron inválida em config.interval: "${config.interval}". O agendamento será usado sem aplicar janela de extração no cron.`,
+  );
+}
+$logger.info(
+  `Agendamento do scraper: original="${config.interval}" aplicado="${scheduleExpression}" janela="${EXTRACTION_WINDOW_LABEL}"`,
+);
+cron.schedule(scheduleExpression, () => {
   runScraper();
 });
