@@ -1,6 +1,6 @@
 import {
   applyExtractionWindowToCron,
-  isFiveFieldCronExpression,
+  isValidCronExpression,
   shouldRunScraperNow,
 } from "../../utils/scraperSchedule";
 
@@ -31,14 +31,14 @@ describe("scraperSchedule", () => {
     });
   });
 
-  describe("isFiveFieldCronExpression", () => {
+  describe("isValidCronExpression", () => {
     it("deve validar cron com 5 campos", () => {
-      expect(isFiveFieldCronExpression("*/45 * * * *")).toBe(true);
+      expect(isValidCronExpression("*/45 * * * *")).toBe(true);
     });
 
     it("deve invalidar cron com quantidade incorreta de campos", () => {
-      expect(isFiveFieldCronExpression("* * * *")).toBe(false);
-      expect(isFiveFieldCronExpression("* * * * * *")).toBe(false);
+      expect(isValidCronExpression("* * * *")).toBe(false);
+      expect(isValidCronExpression("* * * * * *")).toBe(false);
     });
   });
 });

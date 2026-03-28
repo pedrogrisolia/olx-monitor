@@ -9,13 +9,13 @@ const shouldRunScraperNow = (date: Date = new Date()): boolean => {
   return hour >= EXTRACTION_START_HOUR && hour < EXTRACTION_END_HOUR_EXCLUSIVE;
 };
 
-const isFiveFieldCronExpression = (interval: string): boolean => {
+const isValidCronExpression = (interval: string): boolean => {
   const parts = interval.trim().split(/\s+/);
   return parts.length === 5;
 };
 
 const applyExtractionWindowToCron = (interval: string): string => {
-  if (!isFiveFieldCronExpression(interval)) {
+  if (!isValidCronExpression(interval)) {
     return interval;
   }
 
@@ -28,5 +28,5 @@ export {
   shouldRunScraperNow,
   applyExtractionWindowToCron,
   EXTRACTION_WINDOW_LABEL,
-  isFiveFieldCronExpression,
+  isValidCronExpression,
 };

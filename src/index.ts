@@ -9,7 +9,7 @@ import * as userUrlRepository from "./repositories/userUrlRepository";
 import {
   applyExtractionWindowToCron,
   EXTRACTION_WINDOW_LABEL,
-  isFiveFieldCronExpression,
+  isValidCronExpression,
   shouldRunScraperNow,
 } from "./utils/scraperSchedule";
 
@@ -81,11 +81,11 @@ const main = async (): Promise<void> => {
 main();
 
 // Agendamento de execuções periódicas
-const isValidCronExpression = isFiveFieldCronExpression(config.interval);
-const scheduleExpression = isValidCronExpression
+const isCronValid = isValidCronExpression(config.interval);
+const scheduleExpression = isCronValid
   ? applyExtractionWindowToCron(config.interval)
   : config.interval;
-if (!isValidCronExpression) {
+if (!isCronValid) {
   $logger.warn(
     `Expressão cron inválida em config.interval: "${config.interval}". O agendamento será usado sem aplicar janela de extração no cron.`,
   );
