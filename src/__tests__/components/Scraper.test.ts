@@ -146,6 +146,7 @@ ${JSON.stringify({
 
 describe("Scraper", () => {
   let setTimeoutSpy: jest.SpyInstance;
+  let dateSpy: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -159,10 +160,12 @@ describe("Scraper", () => {
           return 0 as unknown as NodeJS.Timeout;
         }) as typeof setTimeout,
       );
+    dateSpy = jest.spyOn(Date.prototype, "getHours").mockReturnValue(10);
   });
 
   afterEach(() => {
     setTimeoutSpy.mockRestore();
+    dateSpy.mockRestore();
   });
 
   describe("extractTotalOfAds", () => {
@@ -348,11 +351,19 @@ describe("Scraper", () => {
       expect(logger.error).toHaveBeenCalledWith(
         expect.stringContaining("Cloudflare bloqueou a requisição"),
       );
-      expect(notifier.sendNotification).toHaveBeenCalledWith(
-        expect.stringContaining(
-          "A OLX bloqueou temporariamente o acesso desta busca",
-        ),
-        "123456789",
+      expect(notifier.sendNotification).not.toHaveBeenCalled();
+    });
+
+    it("deve pausar extração entre meia-noite e 5 da manhã", async () => {
+      dateSpy.mockReturnValue(2);
+
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+
+      expect(assertProxyIsWorking).not.toHaveBeenCalled();
+      expect(httpClient).not.toHaveBeenCalled();
+      expect(scraperRepository.getLogsByUrl).not.toHaveBeenCalled();
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining("Extraction paused between 00:00 and 05:00"),
       );
     });
 
@@ -437,7 +448,7 @@ describe("Scraper", () => {
 
       await scraper("https://www.olx.com.br/imoveis?pe=300000");
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 15000);
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 30000);
       expect(scraperRepository.saveLog).toHaveBeenCalledWith({
         url: "https://www.olx.com.br/imoveis?pe=300000",
         adsFound: 2,

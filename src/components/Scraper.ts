@@ -13,7 +13,9 @@ import Ad from "./Ad";
  * Limite máximo de anúncios por busca
  */
 const MAX_ADS_PER_SEARCH = 500;
-const NEXT_PAGE_DELAY_MS = 15000;
+const NEXT_PAGE_DELAY_MS = 30000;
+const EXTRACTION_PAUSE_START_HOUR = 0;
+const EXTRACTION_PAUSE_END_HOUR = 5;
 
 /**
  * Variáveis de estado do scraper (resetadas a cada URL)
@@ -74,6 +76,17 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
   const userId = typeof urlInfo === "object" ? urlInfo.userId : null;
   const chatId = typeof urlInfo === "object" ? urlInfo.chatId : null;
 
+  const currentHour = new Date().getHours();
+  if (
+    currentHour >= EXTRACTION_PAUSE_START_HOUR &&
+    currentHour < EXTRACTION_PAUSE_END_HOUR
+  ) {
+    logger.info(
+      `Extraction paused between 00:00 and 05:00. Skipping URL ${url}.`,
+    );
+    return;
+  }
+
   // Valida proxy (quando configurado) antes de iniciar scraping
   await assertProxyIsWorking();
 
@@ -105,19 +118,6 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
           `Cloudflare bloqueou a requisição para ${currentUrl}. Considere usar OLX_PROXY_URL com proxy residencial/mobile BR.`,
         );
         await saveHtmlDebug(response, currentUrl, "cloudflare-blocked");
-
-        if (chatId) {
-          try {
-            await notifier.sendNotification(
-              "⚠️ A OLX bloqueou temporariamente o acesso desta busca (Cloudflare). Verifique o IP/proxy de saída (idealmente residencial/mobile BR).",
-              chatId,
-            );
-          } catch (error) {
-            logger.error(
-              "Could not send Cloudflare block notification: " + error,
-            );
-          }
-        }
 
         return;
       }
