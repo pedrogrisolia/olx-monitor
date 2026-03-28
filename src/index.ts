@@ -8,12 +8,15 @@ import { logStartupUsersSummary } from "./components/StartupSummary";
 import * as userUrlRepository from "./repositories/userUrlRepository";
 import {
   applyExtractionWindowToCron,
+  EXTRACTION_WINDOW_LABEL,
+  isFiveFieldCronExpression,
   shouldRunScraperNow,
 } from "./utils/scraperSchedule";
 
 // Logger com interface mínima
 interface Logger {
   info: (message: string) => void;
+  warn: (message: string) => void;
   error: (message: string | Error) => void;
 }
 
@@ -24,9 +27,11 @@ const $logger: Logger = require("./components/Logger");
  * Executa o scraper para todas as URLs ativas dos usuários
  */
 const runScraper = async (): Promise<void> => {
+  // Guarda defensiva para chamadas manuais e fallback quando config.interval é inválido.
+  // Em operação normal, o cron já restringe a execução à janela de extração.
   if (!shouldRunScraperNow()) {
     $logger.info(
-      "Fora da janela de extração (05:00-23:59). Execução do scraper ignorada.",
+      `Fora da janela de extração (${EXTRACTION_WINDOW_LABEL}). Execução do scraper ignorada.`,
     );
     return;
   }
@@ -76,7 +81,18 @@ const main = async (): Promise<void> => {
 main();
 
 // Agendamento de execuções periódicas
-const scheduleExpression = applyExtractionWindowToCron(config.interval);
+const isValidCronExpression = isFiveFieldCronExpression(config.interval);
+const scheduleExpression = isValidCronExpression
+  ? applyExtractionWindowToCron(config.interval)
+  : config.interval;
+if (!isValidCronExpression) {
+  $logger.warn(
+    `Expressão cron inválida em config.interval: "${config.interval}". O agendamento será usado sem aplicar janela de extração no cron.`,
+  );
+}
+$logger.info(
+  `Agendamento do scraper: original="${config.interval}" aplicado="${scheduleExpression}" janela="${EXTRACTION_WINDOW_LABEL}"`,
+);
 cron.schedule(scheduleExpression, () => {
   runScraper();
 });
