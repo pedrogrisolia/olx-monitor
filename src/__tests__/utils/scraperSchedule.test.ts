@@ -1,4 +1,7 @@
-import { shouldRunScraperNow } from "../../utils/scraperSchedule";
+import {
+  applyExtractionWindowToCron,
+  shouldRunScraperNow,
+} from "../../utils/scraperSchedule";
 
 describe("scraperSchedule", () => {
   describe("shouldRunScraperNow", () => {
@@ -13,6 +16,17 @@ describe("scraperSchedule", () => {
 
     it("deve retornar true no fim do dia", () => {
       expect(shouldRunScraperNow(new Date("2026-03-28T23:59:59"))).toBe(true);
+    });
+  });
+
+  describe("applyExtractionWindowToCron", () => {
+    it("deve manter minutos e demais campos e limitar horas para 5-23", () => {
+      expect(applyExtractionWindowToCron("*/45 * * * *")).toBe("*/45 5-23 * * *");
+      expect(applyExtractionWindowToCron("0 */2 * * 1-5")).toBe("0 5-23 * * 1-5");
+    });
+
+    it("deve retornar expressão original quando cron for inválido", () => {
+      expect(applyExtractionWindowToCron("* * * *")).toBe("* * * *");
     });
   });
 });

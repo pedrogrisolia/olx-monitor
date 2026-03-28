@@ -6,7 +6,10 @@ import { createTables } from './database/database';
 import { initializeTelegramBot } from './components/TelegramBot';
 import { logStartupUsersSummary } from "./components/StartupSummary";
 import * as userUrlRepository from "./repositories/userUrlRepository";
-import { shouldRunScraperNow } from "./utils/scraperSchedule";
+import {
+  applyExtractionWindowToCron,
+  shouldRunScraperNow,
+} from "./utils/scraperSchedule";
 
 // Logger com interface mínima
 interface Logger {
@@ -73,6 +76,7 @@ const main = async (): Promise<void> => {
 main();
 
 // Agendamento de execuções periódicas
-cron.schedule(config.interval, () => {
+const scheduleExpression = applyExtractionWindowToCron(config.interval);
+cron.schedule(scheduleExpression, () => {
   runScraper();
 });
