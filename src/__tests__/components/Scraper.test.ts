@@ -367,6 +367,37 @@ describe("Scraper", () => {
       );
     });
 
+    it("deve pausar também nos horários de borda 00:00 e 04:00", async () => {
+      dateSpy.mockReturnValue(0);
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+
+      expect(httpClient).not.toHaveBeenCalled();
+
+      jest.clearAllMocks();
+      (assertProxyIsWorking as jest.Mock).mockResolvedValue(undefined);
+      dateSpy.mockReturnValue(4);
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+
+      expect(httpClient).not.toHaveBeenCalled();
+    });
+
+    it("não deve pausar fora da janela (05:00 e 23:00)", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
+      (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
+
+      dateSpy.mockReturnValue(5);
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+      expect(httpClient).toHaveBeenCalledTimes(1);
+
+      jest.clearAllMocks();
+      (assertProxyIsWorking as jest.Mock).mockResolvedValue(undefined);
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
+      (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
+      dateSpy.mockReturnValue(23);
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+      expect(httpClient).toHaveBeenCalledTimes(1);
+    });
+
     it("deve parar paginação quando __NEXT_DATA__ está ausente", async () => {
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
         { id: 1 },

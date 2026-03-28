@@ -82,7 +82,7 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
     currentHour < EXTRACTION_PAUSE_END_HOUR
   ) {
     logger.info(
-      `Extraction paused between 00:00 and 05:00. Skipping URL ${url}.`,
+      `Extraction paused between ${String(EXTRACTION_PAUSE_START_HOUR).padStart(2, "0")}:00 and ${String(EXTRACTION_PAUSE_END_HOUR).padStart(2, "0")}:00. Skipping URL ${url}.`,
     );
     return;
   }
