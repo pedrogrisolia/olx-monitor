@@ -6,6 +6,7 @@ import { createTables } from './database/database';
 import { initializeTelegramBot } from './components/TelegramBot';
 import { logStartupUsersSummary } from "./components/StartupSummary";
 import * as userUrlRepository from "./repositories/userUrlRepository";
+import { shouldRunScraperNow } from "./utils/scraperSchedule";
 
 // Logger com interface mínima
 interface Logger {
@@ -20,6 +21,13 @@ const $logger: Logger = require("./components/Logger");
  * Executa o scraper para todas as URLs ativas dos usuários
  */
 const runScraper = async (): Promise<void> => {
+  if (!shouldRunScraperNow()) {
+    $logger.info(
+      "Fora da janela de extração (05:00-23:59). Execução do scraper ignorada.",
+    );
+    return;
+  }
+
   const userUrls = await userUrlRepository.getAllActiveUrls();
 
   if (userUrls.length === 0) {

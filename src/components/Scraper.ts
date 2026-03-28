@@ -14,8 +14,6 @@ import Ad from "./Ad";
  */
 const MAX_ADS_PER_SEARCH = 500;
 const NEXT_PAGE_DELAY_MS = 30000;
-const EXTRACTION_PAUSE_START_HOUR = 0;
-const EXTRACTION_PAUSE_END_HOUR = 5;
 
 /**
  * Variáveis de estado do scraper (resetadas a cada URL)
@@ -75,17 +73,6 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
   const url = typeof urlInfo === "string" ? urlInfo : urlInfo.url;
   const userId = typeof urlInfo === "object" ? urlInfo.userId : null;
   const chatId = typeof urlInfo === "object" ? urlInfo.chatId : null;
-
-  const currentHour = new Date().getHours();
-  if (
-    currentHour >= EXTRACTION_PAUSE_START_HOUR &&
-    currentHour < EXTRACTION_PAUSE_END_HOUR
-  ) {
-    logger.info(
-      `Extraction paused between ${String(EXTRACTION_PAUSE_START_HOUR).padStart(2, "0")}:00 and ${String(EXTRACTION_PAUSE_END_HOUR).padStart(2, "0")}:00. Skipping URL ${url}.`,
-    );
-    return;
-  }
 
   // Valida proxy (quando configurado) antes de iniciar scraping
   await assertProxyIsWorking();
