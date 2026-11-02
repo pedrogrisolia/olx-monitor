@@ -111,12 +111,6 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
 
       const $ = cheerio.load(response);
 
-      // Se não existir __NEXT_DATA__, salva o HTML para análise (a OLX pode ter mudado ou bloqueado)
-      const nextDataScript = $('script[id="__NEXT_DATA__"]').text();
-      if (!nextDataScript) {
-        await saveHtmlDebug(response, currentUrl, "missing __NEXT_DATA__");
-      }
-
       // Extrair totalOfAds apenas na primeira iteração
       if (page === 1) {
         const totalAds = extractTotalOfAds($);
@@ -272,26 +266,7 @@ const scrapePage = async (
   chatId: string | number | null = null
 ): Promise<boolean> => {
   try {
-    const script = $('script[id="__NEXT_DATA__"]').text();
-
-    if (!script) {
-      return false;
-    }
-
-    const parsedData = JSON.parse(script) as {
-      props: {
-        pageProps: {
-          ads: Array<{
-            listId: number;
-            subject: string;
-            url: string;
-            price?: string;
-          }>;
-        };
-      };
-    };
-
-    const adList = parsedData.props.pageProps.ads;
+    const adList = extractAdList($);
 
     if (!Array.isArray(adList) || !adList.length) {
       return false;
@@ -344,6 +319,88 @@ const scrapePage = async (
     logger.error(error as Error);
     throw new Error('Scraping failed');
   }
+};
+
+/**
+ * Anúncio como vem na listagem da OLX
+ */
+interface OlxListingAd {
+  listId: number;
+  subject: string;
+  url: string;
+  price?: string;
+}
+
+const FLIGHT_PUSH_PREFIX = 'self.__next_f.push(';
+const FLIGHT_ADS_MARKER = '"ads":[';
+
+/**
+ * Extrai a lista de anúncios da página
+ * Suporta o formato antigo (script __NEXT_DATA__) e o atual do Next.js App Router
+ * (payload RSC enviado em scripts self.__next_f.push)
+ * @param $ Instância do Cheerio carregada com o HTML
+ * @returns Lista de anúncios ou null se não encontrada
+ */
+const extractAdList = ($: cheerio.CheerioAPI): OlxListingAd[] | null => {
+  const nextDataScript = $('script[id="__NEXT_DATA__"]').text();
+  if (nextDataScript) {
+    const parsedData = JSON.parse(nextDataScript) as {
+      props: { pageProps: { ads: OlxListingAd[] } };
+    };
+    return parsedData.props.pageProps.ads;
+  }
+
+  // O payload RSC é uma string dividida em vários chunks [1, "..."]
+  const flight = $('script')
+    .map((_, el) => $(el).text().trim())
+    .get()
+    .filter((text) => text.startsWith(FLIGHT_PUSH_PREFIX))
+    .map((text) => JSON.parse(text.slice(FLIGHT_PUSH_PREFIX.length, text.lastIndexOf(')'))) as unknown[])
+    .filter((chunk) => chunk[0] === 1 && typeof chunk[1] === 'string')
+    .map((chunk) => chunk[1] as string)
+    .join('');
+
+  // A primeira ocorrência de "ads" é a listagem principal (as seguintes são destaques, ex.: topoVipSelection)
+  const markerIndex = flight.indexOf(FLIGHT_ADS_MARKER);
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const startIndex = markerIndex + FLIGHT_ADS_MARKER.length - 1;
+  const endIndex = findClosingBracket(flight, startIndex);
+  if (endIndex === -1) {
+    return null;
+  }
+
+  return JSON.parse(flight.substring(startIndex, endIndex + 1)) as OlxListingAd[];
+};
+
+/**
+ * Encontra o colchete que fecha o array JSON iniciado em startIndex, ignorando o conteúdo de strings
+ * @returns Índice do colchete de fechamento ou -1 se não encontrado
+ */
+const findClosingBracket = (text: string, startIndex: number): number => {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = startIndex; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === '\\') escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === '[') depth++;
+    else if (char === ']') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+
+  return -1;
 };
 
 /**
@@ -464,6 +521,7 @@ export {
   setUrlParam,
   extractTotalOfAds,
   isCloudflareBlockedPage,
+  extractAdList,
 };
 
 // Mantém compatibilidade com require() CommonJS
@@ -474,4 +532,5 @@ module.exports = {
   setUrlParam,
   extractTotalOfAds,
   isCloudflareBlockedPage,
+  extractAdList,
 };

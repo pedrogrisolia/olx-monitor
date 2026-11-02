@@ -67,6 +67,34 @@ ${JSON.stringify({
 </html>
 `;
 
+// Formato atual da OLX (Next.js App Router): dados no payload RSC via self.__next_f.push
+const createHtmlWithFlightData = (
+  ads: Array<Record<string, unknown>>,
+  splitAt = 40,
+) => {
+  const flight =
+    `0:["$","main",null,{"children":["$","$L25",null,{"ads":${JSON.stringify(ads)},"pageIndex":1}]}]\n` +
+    `1:{"topoVipSelection":{"seller":null,"ads":[]}}\n`;
+  const chunks = [flight.slice(0, splitAt), flight.slice(splitAt)];
+  const scripts = chunks
+    .map(
+      (chunk) =>
+        `<script>self.__next_f.push(${JSON.stringify([1, chunk])})</script>`,
+    )
+    .join("\n");
+
+  return `
+<!DOCTYPE html>
+<html>
+<head><title>OLX</title></head>
+<body>
+<script>(self.__next_f=self.__next_f||[]).push([0])</script>
+${scripts}
+</body>
+</html>
+`;
+};
+
 const createHtmlWithDataLayer = (totalOfAds: number) => `
 <!DOCTYPE html>
 <html>
@@ -298,6 +326,50 @@ describe("Scraper", () => {
 
       expect(logger.debug).toHaveBeenCalledWith("Checking ad: 1");
     });
+
+    it("deve extrair anúncios do payload RSC (self.__next_f) quando __NEXT_DATA__ não existe", async () => {
+      const html = createHtmlWithFlightData([
+        {
+          subject: "Casa Centro",
+          listId: 1548938911,
+          url: "https://rj.olx.com.br/imoveis/casa-centro-1548938911",
+          price: "R$ 230.000",
+        },
+        { advertisingId: "listing-native-list-item-1-pub" },
+        {
+          subject: 'Apto "vista mar" [2 quartos]',
+          listId: 1548938912,
+          url: "https://rj.olx.com.br/imoveis/apto-1548938912",
+          price: "R$ 390.000",
+        },
+      ]);
+      const $ = cheerio.load(html);
+
+      const result = await scrapePage(
+        $,
+        "imoveis",
+        false,
+        "https://olx.com.br/busca",
+      );
+
+      expect(result).toBe(true);
+      expect(logger.debug).toHaveBeenCalledWith("Checking ad: 3");
+      expect(logger.debug).not.toHaveBeenCalledWith("Checking ad: 4");
+    });
+
+    it("deve retornar false quando o payload RSC não contém anúncios", async () => {
+      const html = createHtmlWithFlightData([]);
+      const $ = cheerio.load(html);
+
+      const result = await scrapePage(
+        $,
+        "imoveis",
+        false,
+        "https://olx.com.br/busca",
+      );
+
+      expect(result).toBe(false);
+    });
   });
 
   describe("setUrlParam", () => {
@@ -439,6 +511,43 @@ describe("Scraper", () => {
         averagePrice: 150000,
         minPrice: 100000,
         maxPrice: 200000,
+      });
+    });
+
+    it("deve processar anúncios do payload RSC e salvar log com estatísticas", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
+
+      (httpClient as jest.Mock)
+        .mockResolvedValueOnce(
+          createHtmlWithFlightData([
+            {
+              listId: 1,
+              subject: "Casa 1",
+              url: "https://olx.com.br/1",
+              price: "R$ 100.000",
+            },
+            { advertisingId: "listing-native-list-item-1-pub" },
+            {
+              listId: 2,
+              subject: "Casa 2",
+              url: "https://olx.com.br/2",
+              price: "R$ 300.000",
+            },
+          ]),
+        )
+        .mockResolvedValueOnce(createHtmlWithFlightData([]));
+
+      await scraper("https://www.olx.com.br/imoveis?pe=400000");
+
+      expect(httpClient).toHaveBeenCalledTimes(2);
+      expect(scraperRepository.saveLog).toHaveBeenCalledWith({
+        url: "https://www.olx.com.br/imoveis?pe=400000",
+        adsFound: 2,
+        averagePrice: 200000,
+        minPrice: 100000,
+        maxPrice: 300000,
       });
     });
 

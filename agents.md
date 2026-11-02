@@ -500,6 +500,8 @@ O scraper:
 4. Acessa `props.pageProps.ads`
 5. Processa cada anúncio do array
 
+**Formato atual (desde ~abril/2026):** a listagem migrou para o Next.js App Router e não tem mais `__NEXT_DATA__`. Os dados vêm no payload RSC, em vários `<script>self.__next_f.push([1, "..."])</script>`. `extractAdList()` em `Scraper.ts` junta os chunks do tipo `1`, procura a primeira ocorrência de `"ads":[` (a listagem principal; as seguintes, como `topoVipSelection.ads`, são destaques) e faz parse do array. Os campos são os mesmos (`listId`, `subject`, `url`, `price`). Itens sem `listId` são banners de publicidade e são descartados por `Ad.isValidAd()`. O formato antigo continua suportado como primeira opção.
+
 ---
 
 ## Padrões e Convenções
@@ -719,7 +721,7 @@ git log -1 --oneline              # commit em produção
 
 ### Estado em 2026-11-02
 
-O container não existe no servidor: não há imagem `olx-monitor` nem container ativo. A última execução registrada em `data/scrapper.log` foi em 2026-09-05 15:00, terminando com HTTP 407 do proxy. O código está em `ad47068`, igual ao `origin/main`. Para religar: corrigir `OLX_PROXY_URL` e rodar `docker compose up -d --build`.
+Container `olx-monitor-olx-monitor-1` ativo. `OLX_PROXY_URL` foi trocado por um proxy ISP BR (`isp-node101.ipbr.pro`), que passou na validação; o `.env` anterior ficou em `src/.env.bak-*`. Entre abril e novembro de 2026 o scraper encontrava 0 anúncios porque a OLX removeu o `__NEXT_DATA__`; isso foi corrigido com a leitura do payload RSC (ver "Extração de Dados do OLX").
 
 ---
 
