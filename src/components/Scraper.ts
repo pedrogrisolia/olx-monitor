@@ -16,6 +16,11 @@ const MAX_ADS_PER_SEARCH = 500;
 const NEXT_PAGE_DELAY_MS = 30000;
 
 /**
+ * Idade máxima do último log para que a busca continue notificando
+ */
+const STALE_LOG_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
  * Variáveis de estado do scraper (resetadas a cada URL)
  */
 let page = 1;
@@ -405,13 +410,22 @@ const findClosingBracket = (text: string, startIndex: number): number => {
 
 /**
  * Verifica se a URL já foi pesquisada anteriormente
+ * Se a última varredura com sucesso for mais antiga que STALE_LOG_MAX_AGE_MS, trata como
+ * primeira execução: o banco está desatualizado e todo anúncio pareceria novo
  * @param url URL para verificar
  * @returns true se já foi pesquisada (deve notificar), false se é primeira execução
  */
 const urlAlreadySearched = async (url: string): Promise<boolean> => {
   try {
-    const ad = await scraperRepository.getLogsByUrl(url, 1);
-    if (ad.length) {
+    const logs = await scraperRepository.getLogsByUrl(url, 1);
+    if (logs.length) {
+      const lastRun = Date.parse(logs[0].created);
+      if (!Number.isNaN(lastRun) && Date.now() - lastRun > STALE_LOG_MAX_AGE_MS) {
+        logger.info(
+          `Last successful run for URL ${url} was at ${logs[0].created} - treating as first run, no notifications`,
+        );
+        return false;
+      }
       return true;
     }
     logger.info('First run, no notifications');

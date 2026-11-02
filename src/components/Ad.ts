@@ -132,7 +132,7 @@ class Ad {
       await this.updatePrice();
 
       // just send a notification if the price dropped and reduction is greater than 5%
-      if (this.price < this.saved.price) {
+      if (this.notify && this.price < this.saved.price) {
         const decreasePercentage = Math.abs(
           Math.round(((this.price - this.saved.price) / this.saved.price) * 100)
         );

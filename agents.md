@@ -146,6 +146,7 @@ cron.schedule() → runScraper() (periodicamente)
  - Consulta tabela `logs` para verificar se URL já foi pesquisada
  - Retorna `true` se já foi pesquisada (deve notificar)
  - Retorna `false` na primeira execução (não notifica)
+ - Retorna `false` também se o log mais recente da URL tiver mais de 2 dias (`STALE_LOG_MAX_AGE_MS`): com o banco desatualizado, todo anúncio pareceria novo e geraria uma rajada de notificações
 
 - `setUrlParam(url, param, value)`: Utilitário para modificar parâmetros de URL
  - Usado para adicionar parâmetro `o` (página) à URL
@@ -203,6 +204,7 @@ cron.schedule() → runScraper() (periodicamente)
  - Se diferente: atualiza banco
  - Se redução maior que 5%: calcula percentual e notifica
  - Reduções menores que 5% são atualizadas no banco mas não notificadas
+ - Com `notify === false` (primeira execução ou log antigo), quedas de preço também só atualizam o banco
 
 ---
 

@@ -41,6 +41,7 @@ import logger from "../../components/Logger";
 import {
   scraper,
   scrapePage,
+  urlAlreadySearched,
   extractTotalOfAds,
   setUrlParam,
   isCloudflareBlockedPage,
@@ -369,6 +370,36 @@ describe("Scraper", () => {
       );
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe("urlAlreadySearched", () => {
+    const hoursAgo = (hours: number) =>
+      new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+    it("deve retornar false quando a URL nunca foi pesquisada", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
+
+      expect(await urlAlreadySearched("https://olx.com.br/busca")).toBe(false);
+    });
+
+    it("deve retornar true quando o último log é recente", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1, created: hoursAgo(6) },
+      ]);
+
+      expect(await urlAlreadySearched("https://olx.com.br/busca")).toBe(true);
+    });
+
+    it("deve retornar false quando o último log é antigo (evita rajada de notificações)", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1, created: hoursAgo(24 * 30) },
+      ]);
+
+      expect(await urlAlreadySearched("https://olx.com.br/busca")).toBe(false);
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.stringContaining("treating as first run"),
+      );
     });
   });
 

@@ -73,7 +73,7 @@ const getLogsByUrl = async (
 ): Promise<ScrapeLogRow[]> => {
   $logger.debug('scrapperRepository: getLogsByUrl');
 
-  const query = `SELECT * FROM logs WHERE url = ? LIMIT ?`;
+  const query = `SELECT * FROM logs WHERE url = ? ORDER BY id DESC LIMIT ?`;
   const values = [url, limit];
 
   return new Promise<ScrapeLogRow[]>((resolve, reject) => {

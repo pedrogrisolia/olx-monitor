@@ -108,6 +108,23 @@ describe('scrapperRepository', () => {
       expect(logs).toHaveLength(2);
     });
 
+    it('deve retornar os logs mais recentes primeiro', async () => {
+      const logData = {
+        url: 'https://olx.com.br/order-test',
+        averagePrice: 100,
+        minPrice: 50,
+        maxPrice: 150,
+      };
+
+      await saveLog({ ...logData, adsFound: 1 }, testDb);
+      await saveLog({ ...logData, adsFound: 2 }, testDb);
+      await saveLog({ ...logData, adsFound: 3 }, testDb);
+
+      const logs = await getLogsByUrl('https://olx.com.br/order-test', 1, testDb);
+
+      expect(logs[0].adsFound).toBe(3);
+    });
+
     it('deve retornar array vazio para URL sem logs', async () => {
       const logs = await getLogsByUrl('https://olx.com.br/no-logs', 10, testDb);
       expect(logs).toEqual([]);

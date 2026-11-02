@@ -191,6 +191,34 @@ describe('Ad', () => {
       );
     });
 
+    it('deve atualizar preço sem notificar queda > 5% quando notify é false', async () => {
+      (adRepository.getAd as jest.Mock).mockResolvedValue({
+        id: 12345,
+        url: 'https://olx.com.br/anuncio/12345',
+        title: 'Casa Nova',
+        searchTerm: 'casa',
+        price: 100000,
+        created: '2024-01-01',
+        lastUpdate: '2024-01-01',
+        userId: null,
+      });
+
+      const ad = new Ad({
+        id: 12345,
+        url: 'https://olx.com.br/anuncio/12345',
+        title: 'Casa Nova',
+        searchTerm: 'casa',
+        price: 90000,
+        notify: false,
+        chatId: '123456789',
+      });
+
+      await ad.process();
+
+      expect(adRepository.updateAd).toHaveBeenCalledWith(ad);
+      expect(notifier.sendNotification).not.toHaveBeenCalled();
+    });
+
     it('deve chamar updateAd e sendNotification para queda de exatamente 6%', async () => {
       (adRepository.getAd as jest.Mock).mockResolvedValue({
         id: 12345,
