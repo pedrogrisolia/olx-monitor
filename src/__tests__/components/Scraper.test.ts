@@ -582,6 +582,67 @@ describe("Scraper", () => {
       });
     });
 
+    it("deve buscar ordenando por mais recentes (sf=1) sem alterar a URL salva no log", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
+      (httpClient as jest.Mock)
+        .mockResolvedValueOnce(
+          createHtmlWithFlightData([
+            { listId: 1, subject: "Casa 1", url: "https://olx.com.br/1", price: "R$ 100.000" },
+          ]),
+        )
+        .mockResolvedValueOnce(createHtmlWithFlightData([]));
+
+      await scraper("https://www.olx.com.br/imoveis?pe=300000");
+
+      const fetchedUrl = new URL((httpClient as jest.Mock).mock.calls[0][0]);
+      expect(fetchedUrl.searchParams.get("sf")).toBe("1");
+      expect(fetchedUrl.searchParams.get("o")).toBe("1");
+      expect(scraperRepository.saveLog).toHaveBeenCalledWith(
+        expect.objectContaining({ url: "https://www.olx.com.br/imoveis?pe=300000" }),
+      );
+    });
+
+    it("deve manter a ordenação escolhida pelo usuário na URL", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
+      (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());
+
+      await scraper("https://www.olx.com.br/imoveis?pe=300000&sf=2");
+
+      const fetchedUrl = new URL((httpClient as jest.Mock).mock.calls[0][0]);
+      expect(fetchedUrl.searchParams.get("sf")).toBe("2");
+    });
+
+    it("deve processar chamadas simultâneas uma de cada vez (estado é compartilhado)", async () => {
+      (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([
+        { id: 1 },
+      ]);
+      (httpClient as jest.Mock).mockImplementation(async (url: string) => {
+        const parsed = new URL(url);
+        const isFirstPageOfA =
+          parsed.pathname === "/a" && parsed.searchParams.get("o") === "1";
+        return isFirstPageOfA
+          ? createHtmlWithFlightData([
+              { listId: 1, subject: "Casa 1", url: "https://olx.com.br/1", price: "R$ 100.000" },
+            ])
+          : createHtmlWithFlightData([]);
+      });
+
+      await Promise.all([
+        scraper("https://www.olx.com.br/a"),
+        scraper("https://www.olx.com.br/b"),
+      ]);
+
+      const fetched = (httpClient as jest.Mock).mock.calls.map((call) => {
+        const parsed = new URL(call[0]);
+        return `${parsed.pathname}?o=${parsed.searchParams.get("o")}`;
+      });
+      expect(fetched).toEqual(["/a?o=1", "/a?o=2", "/b?o=1"]);
+    });
+
     it("deve suportar URL como string simples", async () => {
       (scraperRepository.getLogsByUrl as jest.Mock).mockResolvedValue([]);
       (httpClient as jest.Mock).mockResolvedValue(createHtmlWithoutNextData());

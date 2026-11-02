@@ -121,6 +121,8 @@ cron.schedule() → runScraper() (periodicamente)
 **Funções Principais**:
 
 - `scraper(url)`: Função principal que processa uma URL de busca
+ - Chamadas simultâneas (cron, URL nova pelo bot) são enfileiradas: o estado é global ao módulo e não pode ser compartilhado entre duas URLs. `runScraper()` em `index.ts` também ignora o tick do cron se o ciclo anterior ainda estiver rodando
+ - Busca com `sf=1` (mais recentes) se a URL não definir `sf`, para que os 500 primeiros sejam estáveis; o log continua usando a URL original
  - Reseta variáveis de estado
  - Verifica se URL já foi pesquisada
  - Extrai `totalOfAds` do script `#datalayer` na primeira iteração (página 1)

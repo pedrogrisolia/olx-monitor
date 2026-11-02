@@ -23,10 +23,27 @@ interface Logger {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const $logger: Logger = require("./components/Logger");
 
+let isScraperCycleRunning = false;
+
 /**
  * Executa o scraper para todas as URLs ativas dos usuários
+ * Ignora a chamada se o ciclo anterior ainda estiver em andamento
  */
 const runScraper = async (): Promise<void> => {
+  if (isScraperCycleRunning) {
+    $logger.warn("Ciclo anterior do scraper ainda em andamento. Execução ignorada.");
+    return;
+  }
+
+  isScraperCycleRunning = true;
+  try {
+    await runScraperCycle();
+  } finally {
+    isScraperCycleRunning = false;
+  }
+};
+
+const runScraperCycle = async (): Promise<void> => {
   // Guarda defensiva para chamadas manuais e fallback quando config.interval é inválido.
   // Em operação normal, o cron já restringe a execução à janela de extração.
   if (!shouldRunScraperNow()) {

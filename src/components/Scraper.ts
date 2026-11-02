@@ -57,11 +57,38 @@ interface UrlInfo {
 }
 
 /**
+ * Fila que garante uma URL por vez: o estado do scraper é global ao módulo,
+ * e chamadas simultâneas (cron sobreposto, URL nova pelo bot) misturariam paginação e limites
+ */
+let scraperQueue: Promise<void> = Promise.resolve();
+
+/**
  * Função principal do scraper
  * Processa uma URL de busca do OLX e extrai anúncios
+ * Chamadas simultâneas são enfileiradas e executadas em sequência
  * @param urlInfo URL ou objeto com URL e metadados
  */
-const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
+const scraper = (urlInfo: string | UrlInfo): Promise<void> => {
+  const run = scraperQueue.then(() => scrapeUrl(urlInfo));
+  scraperQueue = run.catch(() => undefined);
+  return run;
+};
+
+/**
+ * Força a ordenação por mais recentes (sf=1), salvo se a URL já definir uma ordenação.
+ * Assim os anúncios novos ficam no topo e os primeiros MAX_ADS_PER_SEARCH são estáveis entre execuções
+ * @param url URL de busca configurada pelo usuário
+ * @returns URL usada nas requisições
+ */
+const withNewestFirstSort = (url: string): string => {
+  const newUrl = new URL(url);
+  if (!newUrl.searchParams.has("sf")) {
+    newUrl.searchParams.set("sf", "1");
+  }
+  return newUrl.toString();
+};
+
+const scrapeUrl = async (urlInfo: string | UrlInfo): Promise<void> => {
   // Reset state variables
   page = 1;
   maxPrice = 0;
@@ -91,8 +118,10 @@ const scraper = async (urlInfo: string | UrlInfo): Promise<void> => {
     logger.info(`URL ${url} already processed - notifications enabled`);
   }
 
+  const fetchUrl = withNewestFirstSort(url);
+
   do {
-    currentUrl = setUrlParam(url, "o", page);
+    currentUrl = setUrlParam(fetchUrl, "o", page);
     let response: string | undefined;
     try {
       response = await httpClient(currentUrl);
