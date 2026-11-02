@@ -668,6 +668,61 @@ SELECT * FROM logs ORDER BY created DESC LIMIT 5;
 
 ---
 
+## Servidor de Produção e Deploy
+
+### Acesso
+
+- Host: `65.21.83.235` (Hetzner, bare metal). Acesso como `root` por chave SSH já cadastrada nesta máquina:
+  ```bash
+  ssh -o ConnectTimeout=15 -o BatchMode=yes root@65.21.83.235
+  ```
+- Projeto no servidor: `/root/olx-monitor`, um clone de `https://github.com/pedrogrisolia/olx-monitor`, branch `main`.
+- **O servidor é compartilhado com a produção do LeadHunter** (`/root/updates-proxy`, Postgres, xRDP etc.). Mexa só em `/root/olx-monitor` e no container dele. Não reinicie a máquina, não rode `docker compose` em outras pastas nem `docker system prune`, e não reative o `fstrim.timer`, que está mascarado de propósito porque trava o SSD.
+
+### Arquivos que só existem no servidor (ignorados pelo git)
+
+- `src/.env`: `TELEGRAM_TOKEN` e `OLX_PROXY_URL`. Ele é montado no container como `/usr/app/.env`. O `.env` da raiz não é usado pelo compose.
+- `data/`: `ads.db` (SQLite), `scrapper.log` e `debug/` (dumps HTML do OLX). Faça backup do `ads.db` antes de qualquer deploy que mexa no schema.
+- `src/config.ts` é versionado, mas também é montado por volume. Por isso, alterar o arquivo no servidor só exige `restart`, sem rebuild.
+- Nunca copie o conteúdo dos `.env` para commits, logs ou mensagens.
+
+### Fluxo de deploy
+
+1. Localmente: commit, depois `git push origin main`.
+2. No servidor:
+   ```bash
+   ssh root@65.21.83.235 'cd /root/olx-monitor \
+     && git status --short \
+     && cp data/ads.db data/ads.db.bak-$(date +%Y%m%d%H%M) \
+     && git pull --ff-only origin main \
+     && docker compose up -d --build \
+     && docker compose ps'
+   ```
+   - Se `git status` mostrar alterações locais no servidor, pare e investigue antes do pull. Existe um `stash@{0}` antigo (WIP de `4ccc8e0`, mexe só em `docker-compose.yml`); não o aplique nem descarte sem pedir ao usuário.
+   - O compose usa `restart: unless-stopped`, então o container volta sozinho após um reboot do host.
+3. Verificar:
+   ```bash
+   ssh root@65.21.83.235 'cd /root/olx-monitor && docker compose logs --tail 50 && tail -20 data/scrapper.log'
+   ```
+   Na inicialização, o app valida o proxy (`ProxyValidator`) e imprime o resumo de usuários e URLs (`StartupSummary`). `Proxy configurado em OLX_PROXY_URL não está funcionando: status HTTP 407` indica credencial do proxy inválida ou expirada: corrija `OLX_PROXY_URL` em `src/.env` e rode `docker compose restart`.
+
+### Comandos úteis no servidor
+
+```bash
+cd /root/olx-monitor
+docker compose ps                 # estado do container
+docker compose logs -f --tail 100 # logs do processo
+docker compose restart            # aplica mudanças em src/.env ou src/config.ts
+docker compose down               # para o monitor (não apaga data/)
+git log -1 --oneline              # commit em produção
+```
+
+### Estado em 2026-11-02
+
+O container não existe no servidor: não há imagem `olx-monitor` nem container ativo. A última execução registrada em `data/scrapper.log` foi em 2026-09-05 15:00, terminando com HTTP 407 do proxy. O código está em `ad47068`, igual ao `origin/main`. Para religar: corrigir `OLX_PROXY_URL` e rodar `docker compose up -d --build`.
+
+---
+
 ## Informações Técnicas Adicionais
 
 ### Ciclo de Vida da Aplicação
