@@ -727,6 +727,8 @@ git log -1 --oneline              # commit em produção
 
 Container `olx-monitor-olx-monitor-1` ativo. `OLX_PROXY_URL` foi trocado por um proxy ISP BR (`isp-node101.ipbr.pro`), que passou na validação; o `.env` anterior ficou em `src/.env.bak-*`. Entre abril e novembro de 2026 o scraper encontrava 0 anúncios porque a OLX removeu o `__NEXT_DATA__`; isso foi corrigido com a leitura do payload RSC (ver "Extração de Dados do OLX").
 
+A OLX passou a ignorar URLs que terminam na sub-região (ex.: `.../teresopolis-e-regiao`) e devolve o estado inteiro. É preciso incluir o município (`.../teresopolis-e-regiao/teresopolis`). As URLs 11 e 12 de `user_urls` foram corrigidas para esse formato; o backup anterior é `data/ads.db.bak-202611021951`. Antes de cadastrar uma URL, confira se o `<title>` da página cita a cidade, e não só "RJ".
+
 ---
 
 ## Informações Técnicas Adicionais
