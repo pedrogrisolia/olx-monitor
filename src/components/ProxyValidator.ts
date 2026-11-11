@@ -2,9 +2,13 @@ import config from '../config';
 import logger from './Logger';
 import { getCycleTLSInstance } from './CycleTls';
 import { requestsFingerprints } from '../requestsFingerprints';
+import { withTimeout } from '../utils/withTimeout';
 
 const PROXY_HEALTHCHECK_URL = 'https://www.olx.com.br/';
-const PROXY_HEALTHCHECK_TIMEOUT_MS = 15000;
+/** O CycleTLS recebe o timeout em segundos */
+const PROXY_HEALTHCHECK_TIMEOUT_SECONDS = 15;
+/** Guarda no lado do Node caso a resposta do CycleTLS nunca chegue */
+const PROXY_HEALTHCHECK_HARD_TIMEOUT_MS = 30_000;
 
 const proxyValidationHeaders: Record<string, string> = {
   Accept:
@@ -36,16 +40,20 @@ const assertProxyIsWorking = async (): Promise<void> => {
     requestsFingerprints[Math.floor(Math.random() * requestsFingerprints.length)];
 
   try {
-    const response = await cycleTLS(
-      PROXY_HEALTHCHECK_URL,
-      {
-        userAgent: randomRequestFingerprint[0],
-        ja3: randomRequestFingerprint[1],
-        headers: proxyValidationHeaders,
-        timeout: PROXY_HEALTHCHECK_TIMEOUT_MS,
-        proxy: proxyUrl,
-      },
-      'get'
+    const response = await withTimeout(
+      cycleTLS(
+        PROXY_HEALTHCHECK_URL,
+        {
+          userAgent: randomRequestFingerprint[0],
+          ja3: randomRequestFingerprint[1],
+          headers: proxyValidationHeaders,
+          timeout: PROXY_HEALTHCHECK_TIMEOUT_SECONDS,
+          proxy: proxyUrl,
+        },
+        'get'
+      ),
+      PROXY_HEALTHCHECK_HARD_TIMEOUT_MS,
+      'Validação do proxy'
     );
 
     if (response.status < 200 || response.status >= 400) {

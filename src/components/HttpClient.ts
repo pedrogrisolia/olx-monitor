@@ -2,6 +2,13 @@ import logger from './Logger';
 import { getCycleTLSInstance } from './CycleTls';
 import { requestsFingerprints } from '../requestsFingerprints';
 import config from '../config';
+import { withTimeout } from '../utils/withTimeout';
+
+/** Timeout da requisição no processo Go do CycleTLS (em segundos) */
+const REQUEST_TIMEOUT_SECONDS = 30;
+
+/** Guarda no lado do Node caso a resposta do CycleTLS nunca chegue */
+const REQUEST_HARD_TIMEOUT_MS = 60_000;
 
 /**
  * Headers padrão para as requisições HTTP
@@ -35,15 +42,20 @@ const httpClient = async (url: string): Promise<string | undefined> => {
 
   try {
     // Send request
-    const response = await cycleTLS(
-      url,
-      {
-        userAgent: randomRequestFingerprint[0],
-        ja3: randomRequestFingerprint[1],
-        headers,
-        ...(proxyUrl ? { proxy: proxyUrl } : {}),
-      },
-      'get'
+    const response = await withTimeout(
+      cycleTLS(
+        url,
+        {
+          userAgent: randomRequestFingerprint[0],
+          ja3: randomRequestFingerprint[1],
+          headers,
+          timeout: REQUEST_TIMEOUT_SECONDS,
+          ...(proxyUrl ? { proxy: proxyUrl } : {}),
+        },
+        'get'
+      ),
+      REQUEST_HARD_TIMEOUT_MS,
+      `GET ${url}`
     );
 
     return response.body;
