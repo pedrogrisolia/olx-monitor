@@ -223,6 +223,7 @@ cron.schedule() → runScraper() (periodicamente)
 - Configura headers de navegador real
 - Usa JA3 fingerprint para evitar detecção
 - Retorna body da resposta HTML
+- Timeout de 30 s no CycleTLS (a opção `timeout` é em **segundos**) e uma guarda de 60 s no Node (`utils/withTimeout.ts`). Sem a guarda, uma resposta perdida no websocket do CycleTLS deixava a Promise pendente para sempre e travava o ciclo do scraper (aconteceu de 03/11 a 11/11/2026: só se viam `Ciclo anterior do scraper ainda em andamento`)
 
 **Fingerprints**:
 - User-Agent: Simula Firefox no Linux
